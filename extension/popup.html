@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8" />
+  <title>YouTube Filter — настройки</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      width: 280px;
+      padding: 12px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      margin-bottom: 10px;
+    }
+    button {
+      width: 100%;
+      padding: 8px;
+      cursor: pointer;
+    }
+    .status {
+      font-size: 12px;
+      margin-top: 8px;
+      min-height: 16px;
+    }
+    .status--ok {
+      color: green;
+    }
+    .status--err {
+      color: #c00;
+    }
+    .hint {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+    .quota-box {
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+      font-size: 12px;
+      color: #333;
+    }
+    .quota-box__bar {
+      height: 6px;
+      border-radius: 3px;
+      background: #eee;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .quota-box__fill {
+      height: 100%;
+      background: #3ea6ff;
+    }
+    .toggle-box {
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    .toggle-option {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: normal;
+      margin-bottom: 4px;
+      cursor: pointer;
+    }
+    .toggle-option input {
+      width: auto;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="toggle-box">
+    <label>Разширение</label>
+    <label class="toggle-option">
+      <input type="radio" name="enabled" id="enabledOn" value="on" />
+      Включено
+    </label>
+    <label class="toggle-option">
+      <input type="radio" name="enabled" id="enabledOff" value="off" />
+      Изключено
+    </label>
+  </div>
+  <label for="apiKey">YouTube API ключ</label>
+  <input type="password" id="apiKey" placeholder="AIzaSy..." autocomplete="off" />
+  <div class="hint">Ключът се пази локално в chrome.storage и се ползва само за заявки към googleapis.com.</div>
+  <button id="save">Запази</button>
+  <div class="status" id="status"></div>
+  <div class="quota-box">
+    <div id="quotaText">Зареждане на квота…</div>
+    <div class="quota-box__bar"><div class="quota-box__fill" id="quotaFill" style="width: 0%"></div></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
