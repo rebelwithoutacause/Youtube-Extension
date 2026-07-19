@@ -217,18 +217,33 @@ def _search_topic_videos(
             len(engagement_qualified) - len(relevant_results),
             len(relevant_results),
         )
-    else:
-        # Релевантността би изчистила абсолютно всички кандидати — това е
-        # признак, че заявката описва бранд/канал с различни думи от
-        # реалните заглавия (напр. "Нова телевизия" срещу канал "NOVA" на
-        # латиница), не че резултатите са spam. В този случай филтърът за
-        # релевантност се прескача изцяло за тази заявка.
+    elif len(engagement_qualified) >= settings.relevance_bypass_min_candidates:
+        # Релевантността би изчистила абсолютно всички кандидати, но пулът е
+        # достатъчно голям (>= relevance_bypass_min_candidates), за да е
+        # правдоподобно, че причината е бранд/скрипт разлика (напр. "Нова
+        # телевизия" срещу канал "NOVA" на латиница, ~40-200 кандидата, всички
+        # провалени) — не че всеки от толкова много резултати е случайно
+        # ирелевантен. В този случай филтърът се прескача за тази заявка.
         results = [candidate for _video, candidate in engagement_qualified]
-        if results:
+        logger.info(
+            "Филтърът за релевантност би изчистил всички %d резултата (пул >= %d) — "
+            "прескочен за тази заявка (вероятно бранд/скрипт разлика).",
+            len(results),
+            settings.relevance_bypass_min_candidates,
+        )
+    else:
+        # Малък пул (< relevance_bypass_min_candidates) и никой не минава
+        # релевантността — много по-вероятно е кандидатите просто да са
+        # ирелевантни (напр. едно случайно видео на хинди за заявка "мини
+        # книжка за личните финанси"), не системна бранд/скрипт разлика.
+        # Доверяваме се на филтъра и връщаме празно, вместо grasping at straws.
+        results = []
+        if engagement_qualified:
             logger.info(
-                "Филтърът за релевантност би изчистил всички %d резултата — "
-                "прескочен за тази заявка (вероятно бранд/скрипт разлика).",
-                len(results),
+                "%d кандидат(и) провалиха релевантността, пулът е твърде малък "
+                "(< %d) за bypass — връщаме 0 резултата.",
+                len(engagement_qualified),
+                settings.relevance_bypass_min_candidates,
             )
 
     sorted_results = _group_sort(results, settings.large_channel_subscriber_threshold)
@@ -255,8 +270,25 @@ def _group_sort(
     return top_channel_videos + other_videos
 
 
+# Стандартна българска транслитерация кирилица -> латиница. Позволява
+# заявка на кирилица ("милко атанасов") да съвпадне с канал, чието реално
+# заглавие е изписано на латиница ("Milko Atanasov") — без нея, единственото
+# "точно" съвпадение би бил различен, несвързан канал със същото име на
+# кирилица (напр. открихме реален случай: обскурен канал с 4 абоната вместо
+# истинския с 72 600, само защото писмеността на заявката и заглавието не
+# съвпадат буквено, макар да звучат идентично).
+_CYRILLIC_TO_LATIN = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ж": "zh",
+    "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n",
+    "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f",
+    "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "sht", "ъ": "a",
+    "ь": "y", "ю": "yu", "я": "ya",
+}
+
+
 def _normalize_channel_text(text: str) -> str:
-    return re.sub(r"[^\w]", "", text, flags=re.UNICODE).lower()
+    transliterated = "".join(_CYRILLIC_TO_LATIN.get(ch, ch) for ch in text.lower())
+    return re.sub(r"[^a-z0-9]", "", transliterated)
 
 
 def find_matching_channel(query: str, client: YouTubeClient) -> dict | None:
