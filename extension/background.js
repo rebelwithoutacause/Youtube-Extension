@@ -648,13 +648,27 @@ async function searchTopicVideos(query, keyRotator, publishedAfter, publishedBef
   return groupSort(results);
 }
 
+// getQuotaStatus() никога не трябва да "проваля" отговор на съобщение — ако
+// хвърли грешка (напр. проблем с chrome.storage), sendResponse не се
+// извиква изобщо и Chrome показва "message channel closed before a
+// response was received". Тази обвивка гарантира, че винаги връща нещо
+// (или null), никога не отхвърля promise-а.
+async function safeGetQuotaStatus() {
+  try {
+    return await getQuotaStatus();
+  } catch (error) {
+    console.error("getQuotaStatus() failed:", error);
+    return null;
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message) {
     return false;
   }
 
   if (message.type === "GET_QUOTA_STATUS") {
-    getQuotaStatus().then(sendResponse);
+    safeGetQuotaStatus().then(sendResponse);
     return true;
   }
 
@@ -666,13 +680,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     try {
       const apiKeys = await getApiKeys();
       if (apiKeys.length === 0) {
-        sendResponse({ error: "NO_API_KEY", quota: await getQuotaStatus() });
+        sendResponse({ error: "NO_API_KEY", quota: await safeGetQuotaStatus() });
         return;
       }
 
       const keyRotator = await createKeyRotator(apiKeys);
       if (!keyRotator.hasAvailableKey()) {
-        sendResponse({ error: "QUOTA_EXCEEDED", quota: await getQuotaStatus() });
+        sendResponse({ error: "QUOTA_EXCEEDED", quota: await safeGetQuotaStatus() });
         return;
       }
 
@@ -682,10 +696,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         keyRotator,
         dateRange
       );
-      sendResponse({ results, usedTier, quota: await getQuotaStatus() });
+      sendResponse({ results, usedTier, quota: await safeGetQuotaStatus() });
     } catch (error) {
       const messageText = error instanceof Error ? error.message : String(error);
-      sendResponse({ error: messageText, quota: await getQuotaStatus() });
+      sendResponse({ error: messageText, quota: await safeGetQuotaStatus() });
     }
   })();
 
