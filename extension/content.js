@@ -16,11 +16,11 @@ const BANNER_ID = "yt-filter-overlay-banner";
 const HIDDEN_CLASS = "yt-filter-hidden-native";
 
 const DATE_RANGE_OPTIONS = [
-  { key: "auto", label: "Автоматично" },
-  { key: "3m", label: "3 месеца" },
-  { key: "6m", label: "6 месеца" },
-  { key: "1y", label: "1 година" },
-  { key: "1y+", label: "Над 1 година" },
+  { key: "auto", label: "Auto" },
+  { key: "3m", label: "3 months" },
+  { key: "6m", label: "6 months" },
+  { key: "1y", label: "1 year" },
+  { key: "1y+", label: "Over 1 year" },
 ];
 const DEFAULT_DATE_RANGE = "auto";
 
@@ -28,6 +28,12 @@ let lastProcessedKey = null;
 let currentDateRange = DEFAULT_DATE_RANGE;
 let mutationObserver = null;
 let extensionEnabled = true;
+// Кеш на последно рендерирания панел — YouTube понякога изцяло презаписва
+// контейнера с резултати (собствен re-render), което премахва панела ни от
+// DOM-а. Периодичните проверки само преместват СЪЩЕСТВУВАЩ панел; ако той е
+// изчезнал, го пресъздаваме от този кеш вместо да правим ново мрежово
+// извикване.
+let lastRenderedState = null;
 
 function getSearchQuery() {
   return new URLSearchParams(location.search).get("search_query");
@@ -125,6 +131,7 @@ function scheduleHidePass() {
     // между планирането и изпълнението на този кадър.
     if (extensionEnabled && isResultsPage() && isDefaultAllTab()) {
       hideNativeResults();
+      ensurePanelPresent();
     }
   });
 }
@@ -175,7 +182,7 @@ async function showBanner(text, kind) {
 }
 
 function formatNumber(value) {
-  return new Intl.NumberFormat("bg-BG").format(value);
+  return new Intl.NumberFormat("en-US").format(value);
 }
 
 function formatDate(iso) {
@@ -215,13 +222,13 @@ function renderQuotaLine(quota) {
   const line = document.createElement("div");
   line.className = "yt-filter-quota";
   if (!quota) {
-    line.textContent = "Квота: няма данни";
+    line.textContent = "Quota: no data";
     return line;
   }
   line.textContent =
-    `Квота днес (само от разширението): ${formatNumber(quota.used)} / ${formatNumber(quota.limit)} units ` +
-    `· ~${formatNumber(quota.approxSearchesLeft)} търсения остават. ` +
-    "Реалната квота може да е по-ниска, ако същият API ключ се ползва и другаде (напр. CLI).";
+    `Quota today (extension-only): ${formatNumber(quota.used)} / ${formatNumber(quota.limit)} units ` +
+    `· ~${formatNumber(quota.approxSearchesLeft)} searches left. ` +
+    "The real quota may be lower if the same API key is also used elsewhere (e.g. CLI).";
   return line;
 }
 
@@ -238,24 +245,24 @@ async function renderResults(results, query, dateRange, quota, usedTier) {
 
   const header = document.createElement("div");
   header.className = "yt-filter-panel__header";
-  header.textContent = `Филтрирани резултати с висок органичен интерес (${results.length})`;
+  header.textContent = `Filtered results with high organic interest (${results.length})`;
   panel.appendChild(header);
 
-  // При "Автоматично" каскадата може да е разширила периода отвъд 3 месеца
-  // (изискване: 3м -> 6м -> 1г -> всички, спирайки на първото ниво с
-  // резултати) — обясняваме изрично защо се вижда по-широк период.
+  // With "Auto", the cascade may have widened the range beyond 3 months
+  // (requirement: 3m -> 6m -> 1y -> all, stopping at the first tier with
+  // results) — explicitly explain why a wider range is shown.
   if (dateRange === "auto" && usedTier && usedTier !== "3m") {
     const note = document.createElement("div");
     note.className = "yt-filter-panel__empty";
     note.textContent =
-      `Няма достатъчно резултати в по-кратки периоди — автоматично разширено до "${rangeLabel(usedTier)}".`;
+      `Not enough results in shorter ranges — automatically widened to "${rangeLabel(usedTier)}".`;
     panel.appendChild(note);
   }
 
   if (results.length === 0) {
     const empty = document.createElement("div");
     empty.className = "yt-filter-panel__empty";
-    empty.textContent = "Няма видеа, отговарящи на зададените критерии.";
+    empty.textContent = "No videos match the given criteria.";
     panel.appendChild(empty);
   }
 
@@ -286,6 +293,19 @@ async function renderResults(results, query, dateRange, quota, usedTier) {
     document.body.prepend(panel);
   }
   hideNativeResults();
+
+  lastRenderedState = { results, query, dateRange, quota, usedTier };
+}
+
+// Ако YouTube е презаписал контейнера с резултати и е отнесъл панела ни
+// заедно с него (document.getElementById вече не го намира), го
+// пресъздаваме от последно кешираното състояние — без нова мрежова заявка.
+async function ensurePanelPresent() {
+  if (!lastRenderedState || document.getElementById(PANEL_ID)) {
+    return;
+  }
+  const { results, query, dateRange, quota, usedTier } = lastRenderedState;
+  await renderResults(results, query, dateRange, quota, usedTier);
 }
 
 // YouTube зарежда допълнително съдържание асинхронно, на талази, известно
@@ -306,45 +326,46 @@ function burstHideNativeContent(durationMs = 5000, intervalMs = 150) {
 
 async function runSearch(query, dateRange) {
   removePanel();
+  lastRenderedState = null; // ново търсене в ход — старият кеш вече не е валиден
   ensureObserver();
   burstHideNativeContent();
-  await showBanner(`Филтриране на резултати за "${query}" (${rangeLabel(dateRange)})…`, "loading");
+  await showBanner(`Filtering results for "${query}" (${rangeLabel(dateRange)})…`, "loading");
 
   chrome.runtime.sendMessage({ type: "FILTERED_SEARCH", query, dateRange }, async (response) => {
-    // Ако разширението е било изключено, докато чакахме отговор от
-    // background.js (асинхронна мрежова заявка), този callback все пак ще
-    // "изгърми" по-късно — без тази проверка той презаписва панела/банера,
-    // сякаш нищо не е изключено. Late-response се игнорира изцяло.
+    // If the extension was turned off while we were waiting for a response
+    // from background.js (async network request), this callback will still
+    // fire later — without this check it would overwrite the panel/banner as
+    // if nothing had been turned off. Late responses are ignored entirely.
     if (!extensionEnabled) {
       return;
     }
     if (chrome.runtime.lastError) {
-      await showBanner(`Грешка: ${chrome.runtime.lastError.message}`, "error");
+      await showBanner(`Error: ${chrome.runtime.lastError.message}`, "error");
       return;
     }
     if (!response) {
-      await showBanner("Няма отговор от разширението.", "error");
+      await showBanner("No response from the extension.", "error");
       return;
     }
     if (response.error === "NO_API_KEY") {
       await showBanner(
-        "Няма зададен YouTube API ключ. Отворете иконата на разширението горе вдясно в браузъра и го въведете.",
+        "No YouTube API key set. Open the extension icon in the top-right of the browser and enter one.",
         "error"
       );
       return;
     }
     if (response.error === "QUOTA_EXCEEDED") {
       const used = response.quota ? formatNumber(response.quota.used) : "?";
-      const limit = response.quota ? formatNumber(response.quota.limit) : "10 000";
+      const limit = response.quota ? formatNumber(response.quota.limit) : "10,000";
       await showBanner(
-        `Дневната квота на YouTube Data API е изчерпана (${used} / ${limit} units). ` +
-          "Изчакайте до утре или използвайте друг API ключ — това НЕ означава, че няма подходящи видеа.",
+        `The daily YouTube Data API quota is exhausted (${used} / ${limit} units). ` +
+          "Wait until tomorrow or use another API key — this does NOT mean there are no matching videos.",
         "error"
       );
       return;
     }
     if (response.error) {
-      await showBanner(`Грешка от YouTube API: ${response.error}`, "error");
+      await showBanner(`Error from YouTube API: ${response.error}`, "error");
       return;
     }
     await renderResults(response.results, query, dateRange, response.quota, response.usedTier);
@@ -370,6 +391,7 @@ async function handleNavigation() {
     removePanel();
     removeBanner();
     showNativeResults();
+    lastRenderedState = null;
     return;
   }
 
@@ -389,6 +411,7 @@ setInterval(() => {
     handleNavigation();
   } else if (onAllTab) {
     hideNativeResults();
+    ensurePanelPresent();
   }
 }, 800);
 
@@ -409,6 +432,7 @@ function disableOverlay() {
   removeBanner();
   showNativeResults();
   lastProcessedKey = null; // форсира ново обработване, ако бъде включено пак
+  lastRenderedState = null;
 }
 
 chrome.storage.sync.get({ extensionEnabled: true }).then(({ extensionEnabled: value }) => {
