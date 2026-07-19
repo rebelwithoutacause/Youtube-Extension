@@ -29,6 +29,28 @@ class YouTubeClient:
     def __init__(self, settings: Settings, session: requests.Session | None = None) -> None:
         self._settings = settings
         self._session = session or requests.Session()
+        self._key_index = 0
+        self._exhausted_key_indices: set[int] = set()
+
+    @property
+    def _current_key(self) -> str:
+        return self._settings.api_keys[self._key_index]
+
+    def _rotate_to_next_key(self) -> bool:
+        """Маркира текущия ключ като изчерпан за днес и превключва на следващия
+        наличен. Връща False, ако вече всички ключове са изчерпани."""
+        self._exhausted_key_indices.add(self._key_index)
+        for index in range(len(self._settings.api_keys)):
+            if index not in self._exhausted_key_indices:
+                if index != self._key_index:
+                    logger.warning(
+                        "Ключ %d/%d изчерпан — превключване на ключ %d/%d.",
+                        self._key_index + 1, len(self._settings.api_keys),
+                        index + 1, len(self._settings.api_keys),
+                    )
+                self._key_index = index
+                return True
+        return False
 
     def search_videos(
         self,
@@ -191,11 +213,11 @@ class YouTubeClient:
 
     def _get(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
         url = f"{self._settings.api_base_url}/{endpoint}"
-        request_params = {**params, "key": self._settings.api_key}
 
         attempt = 0
         while True:
             attempt += 1
+            request_params = {**params, "key": self._current_key}
             response = self._session.get(url, params=request_params, timeout=15)
 
             if response.status_code == 429 and attempt <= self._settings.max_retries:
@@ -210,9 +232,16 @@ class YouTubeClient:
             if not response.ok:
                 reason = _extract_error_reason(response)
                 if reason in _QUOTA_ERROR_REASONS:
+                    # Key rotation: превключваме на следващия наличен ключ и
+                    # препробваме СЪЩАТА заявка — прозрачно за извикващия код,
+                    # вместо да провалим цялото търсене заради 1 изчерпан ключ.
+                    if self._rotate_to_next_key():
+                        attempt = 0
+                        continue
                     raise YouTubeQuotaExceededError(
-                        "Дневната квота на YouTube Data API е изчерпана "
-                        f"(reason={reason}). Изчакайте до утре или използвайте друг API ключ."
+                        f"Дневната квота е изчерпана за всичките {len(self._settings.api_keys)} "
+                        f"конфигурирани ключа (reason={reason}). Изчакайте до утре или добавете "
+                        "нов ключ."
                     )
                 raise YouTubeAPIError(
                     f"{endpoint} върна HTTP {response.status_code}: {response.text}"
