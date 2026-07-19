@@ -10,8 +10,8 @@ Two ways to use it:
 
 ## 🎥 Demo
 
-> _Add a link to the demo video here (e.g. a short screen recording showing
-> a search, the filtered results, and how to set up the API key)._
+Watch the demo videos (presentation, API key setup, and a live search walkthrough):
+[Google Drive folder](https://drive.google.com/drive/folders/16gBOkGv7wYI1ld6RiTO0lDYc2vCNjBTK)
 
 ## What it does
 
