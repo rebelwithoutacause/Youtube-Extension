@@ -66,9 +66,11 @@ never synced through your Google account.
 5. Copy the generated key.
 6. (Recommended) Restrict the key: **Edit API key → API restrictions → Restrict key** → check only "YouTube Data API v3". Leave "Application restrictions" set to **None** — the key is used by a browser extension, not a public website.
 
-> The free daily quota is 10,000 units. Each search costs roughly 5–500
-> units depending on the number of candidates and whether the date-range
-> cascade kicks in — check the quota counter inside the extension.
+> The free daily quota is 10,000 units **per API key** (i.e. per Google
+> Cloud project). Each search costs roughly 5–500 units depending on the
+> number of candidates and whether the date-range cascade kicks in — check
+> the quota counter inside the extension. Add multiple keys (see
+> [Key rotation](#key-rotation) above) for a higher combined daily total.
 
 ### 2. Load the extension in your browser
 
