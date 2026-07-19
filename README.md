@@ -32,10 +32,21 @@ videos matching all of the following:
 If the input matches an existing channel's exact name, handle (`@handle`),
 or URL instead of a topic keyword, the tool switches to "channel mode" and
 shows that channel's own top videos by views for the selected period
-instead of doing a topic search.
+instead of doing a topic search. Channel name matching also transliterates
+Cyrillic ⇄ Latin, so a query like `"милко атанасов"` correctly matches a
+channel titled `"Milko Atanasov"` (and vice versa) instead of a different,
+unrelated channel that happens to share the same name in the same script.
 
 Built entirely on the **standard, public YouTube Data API v3** — no
 partner/proprietary API access required.
+
+### Key rotation
+
+You can configure multiple API keys. When the active key hits its daily
+quota, the tool automatically switches to the next one and retries the
+same request — transparent to the caller. This only increases your total
+effective quota if each key comes from a **different** Google Cloud
+project (quota is enforced per-project, not per-key).
 
 ## Setup
 
@@ -58,10 +69,15 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Open `.env` and set your key:
+Open `.env` and set your key(s):
 
 ```
-YOUTUBE_API_KEY=your_api_key_here
+# Multiple keys enable key rotation (must be from different GCP projects
+# to actually add up to a higher combined quota):
+YOUTUBE_API_KEYS=key1_here,key2_here,key3_here
+
+# Or a single key (backwards-compatible, used only if YOUTUBE_API_KEYS is absent):
+# YOUTUBE_API_KEY=your_api_key_here
 ```
 
 ## CLI usage
@@ -83,8 +99,9 @@ Views/Subscribers, Published, Video URL.
 
 The `extension/` folder contains a Chrome/Edge extension that applies the
 exact same logic live on youtube.com's own search results page, plus a
-quota tracker and an on/off toggle. See [`extension/README.md`](extension/README.md)
-for installation and usage instructions.
+per-key quota tracker, key rotation, and an on/off toggle. See
+[`extension/README.md`](extension/README.md) for installation and usage
+instructions.
 
 ## Project structure
 
