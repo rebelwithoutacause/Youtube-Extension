@@ -8,6 +8,10 @@ Two ways to use it:
 - **CLI tool** (`main.py`) — run a search from the terminal, get a table of results.
 - **Browser extension** (`extension/`) — overlays the filtered results directly on youtube.com while you search. See [`extension/README.md`](extension/README.md) for extension-specific setup and usage.
 
+<p align="center">
+  <img src="Screenshot/Interface.png" alt="Extension popup: on/off toggle, API key rotation list, and per-key quota" width="360" />
+</p>
+
 ## 🎥 Demo
 
 Watch the demo videos (presentation, API key setup, and a live search walkthrough):
