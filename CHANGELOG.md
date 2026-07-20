@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## [1.0.1] - 2026-07-20
+
+### Fixed
+- Installer now bundles and silently installs the Microsoft Visual C++
+  2015-2022 x64 Redistributable if it isn't already present, before
+  launching the app. The PyInstaller-built exe depends on
+  `VCRUNTIME140.dll` / `VCRUNTIME140_1.dll` / `ucrtbase.dll` / `msvcp_win.dll`,
+  which are present on most Windows 10/11 machines (usually installed by
+  some other app) but are not guaranteed on a truly bare install — a real
+  install/uninstall test confirmed the rest of the installer works
+  correctly, but this closes the one remaining gap for a genuinely clean
+  machine. Detected via the registry (skipped if already installed), adds
+  ~25 MB to the installer only when needed at install time.
+
 ## [1.0.0] - 2026-07-20
 
 ### Added

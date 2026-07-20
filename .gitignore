@@ -13,6 +13,7 @@ build/
 dist/
 installer/Output/
 installer/version.iss
+installer/redist/
 *.egg-info/
 
 # Personal/debug artifacts kept locally, not part of the published product

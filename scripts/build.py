@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -21,6 +22,14 @@ APP_NAME = "YouTubeContentResearch"
 PRODUCT_NAME = "YouTube Content Research Tool"
 COMPANY_NAME = "YouTube Content Research Tool (open source, unofficial)"
 COPYRIGHT = "MIT License. Not affiliated with YouTube or Google."
+
+# Permanent Microsoft aka.ms redirect for the latest VC++ 2015-2022 x64
+# runtime. Bundled in the installer so the app also runs on a Windows
+# machine that has never had another VC++-built app installed (the
+# PyInstaller-built exe depends on VCRUNTIME140.dll / VCRUNTIME140_1.dll /
+# ucrtbase.dll / msvcp_win.dll, which aren't guaranteed present on a bare
+# Windows install).
+VC_REDIST_URL = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
 
 VERSION_INFO_TEMPLATE = """# UTF-8
 #
@@ -88,6 +97,22 @@ def render_version_info(version: str) -> Path:
     return out_path
 
 
+def fetch_vc_redist() -> Path:
+    redist_dir = ROOT / "installer" / "redist"
+    redist_dir.mkdir(parents=True, exist_ok=True)
+    out_path = redist_dir / "vc_redist.x64.exe"
+
+    if out_path.is_file() and out_path.stat().st_size > 1_000_000:
+        print(f"Reusing cached {out_path}")
+        return out_path
+
+    print(f"Downloading {VC_REDIST_URL} -> {out_path}")
+    urllib.request.urlretrieve(VC_REDIST_URL, out_path)
+    if out_path.stat().st_size < 1_000_000:
+        raise SystemExit(f"Downloaded VC++ redistributable looks too small: {out_path}")
+    return out_path
+
+
 def render_installer_version(version: str) -> Path:
     installer_dir = ROOT / "installer"
     installer_dir.mkdir(parents=True, exist_ok=True)
@@ -133,6 +158,9 @@ def main() -> None:
     installer_version_path = render_installer_version(version)
     print(f"Wrote {version_info_path}")
     print(f"Wrote {installer_version_path}")
+
+    vc_redist_path = fetch_vc_redist()
+    print(f"VC++ redistributable ready at {vc_redist_path}")
 
     run_pyinstaller(version_info_path)
 

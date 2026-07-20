@@ -47,6 +47,7 @@ Source: "..\extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recur
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\.env.example"; DestDir: "{app}"; Flags: ignoreversion
+Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: VCRedistNeedsInstall
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -56,6 +57,7 @@ Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Microsoft Visual C++ Runtime..."; Check: VCRedistNeedsInstall; Flags: waituntilterminated
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: postinstall skipifsilent nowait
 Filename: "{app}\extension"; Description: "Open the extension folder (for Chrome/Edge ""Load unpacked"")"; Flags: postinstall shellexec skipifsilent unchecked
 Filename: "{app}\README.md"; Description: "View the README"; Flags: postinstall shellexec skipifsilent unchecked
@@ -66,6 +68,19 @@ Type: filesandordirs; Name: "{app}"
 [Code]
 var
   ApiKeyPage: TInputQueryWizardPage;
+
+function VCRedistNeedsInstall: Boolean;
+var
+  Installed: Cardinal;
+begin
+  { VC++ 2015-2022 x64 runtime registers itself here with Installed=1 when
+    present (Microsoft-documented detection key). Lives in the 64-bit
+    registry view even on installs where Setup itself runs 32-bit, hence
+    HKLM64. }
+  Result := not (RegQueryDWordValue(HKLM64,
+    'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64', 'Installed', Installed)
+    and (Installed = 1));
+end;
 
 procedure InitializeWizard;
 begin
