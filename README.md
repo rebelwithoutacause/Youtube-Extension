@@ -1,11 +1,17 @@
 # YouTube Content Research Tool
 
+[![Latest release](https://img.shields.io/github/v/release/rebelwithoutacause/Youtube-Extension?label=download&color=e62117)](../../releases/latest)
+
 Find **breakout video topics** from established YouTube channels — videos
 whose view count significantly outperforms the channel's subscriber count,
 which is a strong signal of a viral/trending topic worth studying.
 
 > Unofficial, community-built tool. Not affiliated with, endorsed by, or
 > sponsored by YouTube or Google LLC.
+
+<p align="center">
+  <img src="Screenshot/Interface.png" alt="Extension popup: on/off toggle, API key rotation list, and per-key quota" width="360" />
+</p>
 
 Three ways to use it:
 - **Windows desktop app** — a one-click installer with a wizard, Start Menu
