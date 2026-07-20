@@ -1,0 +1,156 @@
+.yt-filter-hidden-native {
+  display: none !important;
+}
+
+.yt-filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.yt-filter-control {
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  background: transparent;
+  color: #0f0f0f;
+  cursor: pointer;
+}
+
+.yt-filter-control:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.yt-filter-control--active {
+  background: #0f0f0f;
+  color: #ffffff;
+  border-color: #0f0f0f;
+}
+
+.yt-filter-banner {
+  padding: 12px 16px;
+  margin: 8px 0 16px;
+  border-radius: 8px;
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 14px;
+  color: #0f0f0f;
+}
+
+.yt-filter-quota {
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 12px;
+  color: #606060;
+}
+
+.yt-filter-banner--loading {
+  background: rgba(62, 166, 255, 0.12);
+  border: 1px solid #3ea6ff;
+}
+
+.yt-filter-banner--error {
+  background: rgba(255, 82, 82, 0.12);
+  border: 1px solid #ff5252;
+}
+
+.yt-filter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.yt-filter-panel__header {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f0f0f;
+}
+
+.yt-filter-panel__empty {
+  color: #606060;
+}
+
+.yt-filter-card {
+  display: flex;
+  gap: 16px;
+  padding: 8px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.yt-filter-card:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.yt-filter-card__thumb {
+  width: 246px;
+  height: 138px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: #ddd;
+}
+
+.yt-filter-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+}
+
+.yt-filter-card__title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #0f0f0f;
+}
+
+.yt-filter-card__channel {
+  font-size: 13px;
+  color: #606060;
+}
+
+.yt-filter-card__stats {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #606060;
+}
+
+/* YouTube поставя атрибут "dark" на <html>, когато е активна тъмната тема —
+   използваме точно този сигнал (а не CSS custom properties, чиято стойност
+   в контекста на инжектирания панел се оказа ненадеждна и правеше заглавията
+   практически невидими: почти черен текст върху почти черен фон). */
+html[dark] .yt-filter-banner,
+html[dark] .yt-filter-panel__header,
+html[dark] .yt-filter-card__title {
+  color: #f1f1f1;
+}
+
+html[dark] .yt-filter-panel__empty,
+html[dark] .yt-filter-card__channel,
+html[dark] .yt-filter-card__stats,
+html[dark] .yt-filter-quota {
+  color: #aaaaaa;
+}
+
+html[dark] .yt-filter-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html[dark] .yt-filter-control {
+  color: #f1f1f1;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+html[dark] .yt-filter-control:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html[dark] .yt-filter-control--active {
+  background: #f1f1f1;
+  color: #0f0f0f;
+  border-color: #f1f1f1;
+}

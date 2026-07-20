@@ -1,0 +1,29 @@
+# Secrets — never commit real API keys
+.env
+api-key.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Build output
+build/
+dist/
+installer/Output/
+installer/version.iss
+*.egg-info/
+
+# Personal/debug artifacts kept locally, not part of the published product
+error.png
+mini.png
+Untitled*.png
+wrong-results*.png
+Prompt.docx
+demo-script.md
+
+# Editor/OS cruft
+.vscode/
+.idea/
+Thumbs.db

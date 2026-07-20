@@ -1,0 +1,77 @@
+name: Release build
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows installer & extension package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-build.txt
+
+      - name: Verify VERSION matches the pushed tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          tag="${GITHUB_REF#refs/tags/v}"
+          file_version="$(cat VERSION | tr -d '[:space:]')"
+          if [ "$tag" != "$file_version" ]; then
+            echo "::error::Tag v$tag does not match VERSION file ($file_version)."
+            exit 1
+          fi
+
+      - name: Build standalone exe
+        run: python scripts/build.py
+
+      - name: Package browser extension
+        run: python scripts/package_extension.py
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile installer
+        shell: cmd
+        run: '"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\setup.iss'
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp installer/Output/*.exe dist/
+          cd dist
+          sha256sum *.exe *.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-content-research-tool
+          path: |
+            dist/*.exe
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          generate_release_notes: true

@@ -1,0 +1,3 @@
+# Build-only dependencies (packaging), kept separate from runtime requirements.txt.
+pyinstaller>=6.10,<7
+pillow>=10,<12
