@@ -21,6 +21,11 @@ Three ways to use it:
   youtube.com while you search. See [`extension/README.md`](extension/README.md)
   for extension-specific setup and usage.
 
+## 🎥 Demo
+
+Watch the demo videos (presentation, API key setup, and a live search walkthrough):
+[Google Drive folder](https://drive.google.com/drive/folders/16gBOkGv7wYI1ld6RiTO0lDYc2vCNjBTK)
+
 ## What it does
 
 Given a keyword (e.g. `"fasting"`) or a channel name/handle, the tool finds
