@@ -47,11 +47,13 @@ partner/proprietary API access required.
 
 ### Key rotation
 
-You can configure multiple API keys. When the active key hits its daily
-quota, the tool automatically switches to the next one and retries the
-same request — transparent to the caller. This only increases your total
-effective quota if each key comes from a **different** Google Cloud
-project (quota is enforced per-project, not per-key).
+**One API key is enough to run the tool** — `YOUTUBE_API_KEYS` (and the
+installer wizard) accept a single key just fine. Extra keys are entirely
+optional: if you configure more than one, the tool automatically switches
+to the next key when the active one hits its daily quota, retrying the
+same request transparently. This only increases your total effective
+quota if each key comes from a **different** Google Cloud project (quota
+is enforced per-project, not per-key).
 
 ## Getting a YouTube Data API v3 key
 
@@ -75,7 +77,8 @@ Download the latest `YouTubeContentResearchSetup-*.exe` from the
 
 - Walks you through an **installer wizard** with an optional page to enter
   your own YouTube API key(s) up front (or skip it — the app will ask on
-  first run instead).
+  first run instead). One key is enough — the second and third key fields
+  are only for optional quota rotation, not required to run the app.
 - Installs a standalone `YouTubeContentResearch.exe` (no Python required)
   with a Start Menu group, optional desktop shortcut, and a proper
   uninstaller (Add/Remove Programs).
