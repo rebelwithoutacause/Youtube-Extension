@@ -160,24 +160,8 @@ def _search_topic_videos(
         for channel in channels
     }
 
-    # Твърд филтър: само канали с >= min_channel_subscriber_count абонати
-    # (изискване на клиента — търсим пробивни видеа на established канали,
-    # не "hidden gems" от произволен размер канал).
-    big_channel_videos = [
-        video
-        for video in long_videos
-        if subscriber_by_channel.get(video["snippet"]["channelId"], 0)
-        >= settings.min_channel_subscriber_count
-    ]
-    logger.info(
-        "%d от %d видеа отпаднаха заради канал с < %s абонати.",
-        len(long_videos) - len(big_channel_videos),
-        len(long_videos),
-        f"{settings.min_channel_subscriber_count:,}",
-    )
-
     engagement_qualified: list[tuple[dict, VideoResult]] = []
-    for video in big_channel_videos:
+    for video in long_videos:
         channel_id = video["snippet"]["channelId"]
         subscriber_count = subscriber_by_channel.get(channel_id, 0)
         view_count = int(video["statistics"].get("viewCount", 0))
@@ -246,28 +230,9 @@ def _search_topic_videos(
                 settings.relevance_bypass_min_candidates,
             )
 
-    sorted_results = _group_sort(results, settings.large_channel_subscriber_threshold)
+    sorted_results = sorted(results, key=lambda r: r.ratio, reverse=True)
     logger.info("%d видеа отговарят на всички критерии.", len(sorted_results))
     return sorted_results
-
-
-def _group_sort(
-    results: list[VideoResult], large_channel_subscriber_threshold: int
-) -> list[VideoResult]:
-    """
-    Две групи: (1) видеа от големи канали (>= threshold абонати), сортирани по
-    subscriberCount низходящо; (2) останалите, сортирани по ratio низходящо
-    (както досега). Групи 1 излиза първа.
-    """
-    top_channel_videos = [
-        r for r in results if r.subscriber_count >= large_channel_subscriber_threshold
-    ]
-    other_videos = [
-        r for r in results if r.subscriber_count < large_channel_subscriber_threshold
-    ]
-    top_channel_videos.sort(key=lambda r: r.subscriber_count, reverse=True)
-    other_videos.sort(key=lambda r: r.ratio, reverse=True)
-    return top_channel_videos + other_videos
 
 
 # Стандартна българска транслитерация кирилица -> латиница. Позволява

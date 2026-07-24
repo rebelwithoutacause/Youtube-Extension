@@ -2,9 +2,9 @@
 
 [![Latest release](https://img.shields.io/github/v/release/rebelwithoutacause/Youtube-Extension?label=download&color=e62117)](../../releases/latest)
 
-Find **breakout video topics** from established YouTube channels — videos
-whose view count significantly outperforms the channel's subscriber count,
-which is a strong signal of a viral/trending topic worth studying.
+Find **breakout video topics** on YouTube — videos whose view count
+significantly outperforms the channel's subscriber count, which is a strong
+signal of a viral/trending topic worth studying.
 
 > Unofficial, community-built tool. Not affiliated with, endorsed by, or
 > sponsored by YouTube or Google LLC.
@@ -32,15 +32,15 @@ Given a keyword (e.g. `"fasting"`) or a channel name/handle, the tool finds
 videos matching all of the following:
 
 1. **No Shorts** — filtered by actual video duration, not by title text.
-2. **Established channels only** — channel must have **≥100,000 subscribers**.
-3. **Breakout performance** — views must exceed the channel's subscriber
-   count (or be ≥1,000 for very small channels), i.e. the video clearly
-   over-performed relative to the channel's usual reach.
-4. **Recency, with automatic fallback** — tries the last 3 months first; if
+2. **Breakout performance** — views must exceed the channel's subscriber
+   count (or be ≥2,500 for very small channels), i.e. the video clearly
+   over-performed relative to the channel's usual reach. Channel size
+   itself doesn't matter — any channel qualifies as long as its videos
+   clear this bar.
+3. **Recency, with automatic fallback** — tries the last 3 months first; if
    there are no results, automatically widens to 6 months, then 1 year,
    then no limit at all, stopping at the first tier with results.
-5. **Sorted**: videos from the biggest channels first (by subscriber
-   count), then the rest by `views / subscribers` ratio.
+4. **Sorted** by `views / subscribers` ratio.
 
 If the input matches an existing channel's exact name, handle (`@handle`),
 or URL instead of a topic keyword, the tool switches to "channel mode" and

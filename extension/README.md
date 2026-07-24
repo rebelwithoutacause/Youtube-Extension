@@ -2,8 +2,8 @@
 
 A Chrome/Edge extension (Manifest V3) that filters YouTube search results
 directly on the page — instead of the normal results, it shows only videos
-with **high organic interest**: from established channels, with views
-significantly exceeding their subscriber count, excluding Shorts.
+with **high organic interest**: views significantly exceeding their
+channel's subscriber count, excluding Shorts.
 
 ## What it does
 
@@ -15,21 +15,18 @@ all of the following:
 
 1. **Only normal videos** — no YouTube Shorts (detected via the video's
    actual duration, not by text in the title).
-2. **Only from established channels** — only channels with **≥100,000
-   subscribers**.
-3. **Breakout performance** — the video must have "broken out" relative to
-   its channel's size:
+2. **Breakout performance** — the video must have "broken out" relative to
+   its channel's size, regardless of the channel's size:
    - if the channel has ≥100 subscribers → views must exceed the
      subscriber count (`views > subscribers`);
-   - if the channel has <100 subscribers → views must be at least 1000.
-4. **Recency** — only videos published within a selected time window. By
+   - if the channel has <100 subscribers → views must be at least 2500.
+3. **Recency** — only videos published within a selected time window. By
    default, an **automatic cascade** runs: it tries the last 3 months
    first; if there are no results, it widens to 6 months, then 1 year, then
    no date limit at all — stopping at the first tier that has at least one
    result. You can also manually pick a fixed range (3 months / 6 months /
    1 year / older than 1 year).
-5. **Sorting**: videos from the largest channels (by subscriber count)
-   first, then the rest — sorted by `views / subscribers` ratio.
+4. **Sorting**: sorted by `views / subscribers` ratio.
 
 ### Recognizing a channel by name
 

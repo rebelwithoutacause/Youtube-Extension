@@ -5,9 +5,7 @@ const API_BASE = "https://www.googleapis.com/youtube/v3";
 const SEARCH_MAX_RESULTS = 50;
 const MIN_VIDEO_DURATION_SECONDS = 60;
 const SUBSCRIBER_THRESHOLD = 100;
-const MIN_VIEW_COUNT_LOW_SUBS = 1000;
-const MIN_CHANNEL_SUBSCRIBER_COUNT = 100_000;
-const LARGE_CHANNEL_SUBSCRIBER_THRESHOLD = 500_000;
+const MIN_VIEW_COUNT_LOW_SUBS = 2500;
 const RELEVANCE_BYPASS_MIN_CANDIDATES = 5;
 const MAX_RETRIES = 5;
 const RETRY_BACKOFF_MS = 1000;
@@ -276,21 +274,6 @@ function matchesQuery(title, description, query) {
   const requiredWords = mandatoryWords.length > 0 ? mandatoryWords : words;
 
   return requiredWords.every((word) => haystack.includes(stem(word)));
-}
-
-// Две групи: (1) видеа от големи канали (>= threshold абонати), сортирани по
-// subscriberCount низходящо; (2) останалите, сортирани по ratio низходящо.
-// Групa 1 излиза първа.
-function groupSort(results) {
-  const topChannelVideos = results.filter(
-    (r) => r.subscriberCount >= LARGE_CHANNEL_SUBSCRIBER_THRESHOLD
-  );
-  const otherVideos = results.filter(
-    (r) => r.subscriberCount < LARGE_CHANNEL_SUBSCRIBER_THRESHOLD
-  );
-  topChannelVideos.sort((a, b) => b.subscriberCount - a.subscriberCount);
-  otherVideos.sort((a, b) => b.ratio - a.ratio);
-  return [...topChannelVideos, ...otherVideos];
 }
 
 // Стандартна българска транслитерация кирилица -> латиница. Позволява
@@ -585,15 +568,8 @@ async function searchTopicVideos(query, keyRotator, publishedAfter, publishedBef
     channels.map((channel) => [channel.id, Number(channel.statistics.subscriberCount || 0)])
   );
 
-  // Твърд филтър: само канали с >= MIN_CHANNEL_SUBSCRIBER_COUNT абонати
-  // (изискване на клиента — търсим пробивни видеа на established канали,
-  // не "hidden gems" от произволен размер канал).
-  const bigChannelVideos = longVideos.filter(
-    (video) => (subscriberByChannel.get(video.snippet.channelId) || 0) >= MIN_CHANNEL_SUBSCRIBER_COUNT
-  );
-
   const engagementQualified = [];
-  for (const video of bigChannelVideos) {
+  for (const video of longVideos) {
     const channelId = video.snippet.channelId;
     const subscriberCount = subscriberByChannel.get(channelId) || 0;
     const viewCount = Number(video.statistics.viewCount || 0);
@@ -645,7 +621,7 @@ async function searchTopicVideos(query, keyRotator, publishedAfter, publishedBef
     results = [];
   }
 
-  return groupSort(results);
+  return results.sort((a, b) => b.ratio - a.ratio);
 }
 
 // getQuotaStatus() никога не трябва да "проваля" отговор на съобщение — ако

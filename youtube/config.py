@@ -51,9 +51,7 @@ class Settings:
     search_max_pages: int = 4  # 4 x 100 units = 400 units за search.list на търсене
     min_video_duration_seconds: int = 60
     subscriber_threshold: int = 100
-    min_view_count_low_subs: int = 1000
-    min_channel_subscriber_count: int = 100_000
-    large_channel_subscriber_threshold: int = 500_000
+    min_view_count_low_subs: int = 2500
     relevance_bypass_min_candidates: int = 5
     max_retries: int = 5
     retry_backoff_seconds: float = 1.0
