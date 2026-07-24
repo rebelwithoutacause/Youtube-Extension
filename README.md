@@ -145,6 +145,20 @@ python main.py                         # no query -> interactive mode
 Output is a table with: Title, Channel, Subscribers, Views,
 Views/Subscribers, Published, Video URL.
 
+## Running tests
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+pytest
+```
+
+The suite covers `youtube/filters.py` (Shorts detection, relevance
+matching, the breakout-performance rule) and `youtube/search.py`
+(sorting, date-range cascade, relevance bypass, channel-mode, channel
+name matching) against an in-memory fake YouTube client — no real API
+calls or key required. Runs automatically on every push/PR via
+`.github/workflows/sanity-check.yml`.
+
 ## Browser extension
 
 The `extension/` folder contains a Chrome/Edge extension that applies the
@@ -159,6 +173,8 @@ instructions.
 main.py                CLI entry point (also drives the packaged .exe)
 requirements.txt       Runtime Python dependencies
 requirements-build.txt Build-only dependencies (PyInstaller, Pillow)
+requirements-dev.txt   Test-only dependencies (pytest)
+pytest.ini             pytest configuration
 .env.example            Config template (copy to .env and add your API key)
 VERSION                 Single source of truth for the app version
 youtube/
@@ -167,6 +183,10 @@ youtube/
   models.py            VideoResult dataclass
   search.py            Orchestration: search -> filter -> sort, channel-mode detection, date cascade
   config.py            Settings (thresholds, multi-location .env lookup)
+tests/
+  helpers.py           Fake YouTube client + video/channel factories used by the tests
+  test_filters.py      Unit tests for youtube/filters.py
+  test_search.py       Unit tests for youtube/search.py
 extension/             Browser extension (see its own README)
 assets/                App icon source (app.ico / app.png)
 scripts/
@@ -177,6 +197,6 @@ scripts/
 installer/
   setup.iss            Inno Setup installer script
 .github/workflows/
-  sanity-check.yml     Syntax/lint checks on every push and PR
+  sanity-check.yml     Syntax checks + pytest suite on every push and PR
   release.yml          Builds & publishes installer + extension zip on version tags
 ```
