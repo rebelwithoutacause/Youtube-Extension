@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented here.
 
+## [1.0.2] - 2026-07-24
+
+### Changed
+- Breakout-video criteria loosened: channels of any size now qualify (the
+  previous ≥100,000 subscriber gate is gone), the view floor for very small
+  channels (<100 subscribers) is raised from 1,000 to 2,500, and results are
+  sorted purely by views/subscribers ratio instead of grouping the largest
+  channels first. Applies to both the CLI/desktop app and the browser
+  extension (they share the same rules).
+
+### Added
+- `pytest` test suite for `youtube/filters.py` and `youtube/search.py`,
+  backed by an in-memory fake YouTube client (no real API calls or key
+  needed). Runs automatically in CI on every push/PR.
+
+### Fixed
+- Extension manifest description no longer references the removed
+  "established channels only" requirement.
+
+### Internal
+- Bumped all GitHub Actions (`checkout`, `setup-python`, `setup-node`,
+  `upload-artifact`, `action-gh-release`) off their Node.js 20 runtimes to
+  Node.js 24, clearing GitHub's Node 20 deprecation warning.
+
 ## [1.0.1] - 2026-07-20
 
 ### Fixed
