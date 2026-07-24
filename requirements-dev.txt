@@ -1,0 +1,2 @@
+# Test-only dependencies, kept separate from runtime requirements.txt.
+pytest>=7.4,<9

@@ -9,7 +9,7 @@ on:
 
 jobs:
   python:
-    name: Python syntax
+    name: Python syntax & tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,10 +19,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Byte-compile all Python files
         run: python -m py_compile main.py youtube/*.py
+
+      - name: Run tests
+        run: pytest
 
   extension:
     name: Extension syntax
