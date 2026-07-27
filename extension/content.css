@@ -5,8 +5,45 @@
 .yt-filter-controls {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   margin-bottom: 4px;
+}
+
+.yt-filter-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.15);
+  margin: 0 2px;
+}
+
+.yt-filter-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(62, 166, 255, 0.08);
+  border: 1px solid rgba(62, 166, 255, 0.35);
+}
+
+.yt-filter-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 13px;
+  color: #0f0f0f;
+  cursor: pointer;
+  user-select: none;
+}
+
+.yt-filter-radio input[type="radio"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #3ea6ff;
+  cursor: pointer;
 }
 
 .yt-filter-control {
@@ -153,4 +190,17 @@ html[dark] .yt-filter-control--active {
   background: #f1f1f1;
   color: #0f0f0f;
   border-color: #f1f1f1;
+}
+
+html[dark] .yt-filter-divider {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+html[dark] .yt-filter-mode-toggle {
+  background: rgba(62, 166, 255, 0.14);
+  border-color: rgba(62, 166, 255, 0.5);
+}
+
+html[dark] .yt-filter-radio {
+  color: #f1f1f1;
 }

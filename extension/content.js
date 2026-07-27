@@ -24,8 +24,20 @@ const DATE_RANGE_OPTIONS = [
 ];
 const DEFAULT_DATE_RANGE = "auto";
 
+// "video" винаги търси по думи (никога не разпознава канал от заявката, дори
+// тя случайно да съвпада с точно име на канал). "channel" изрично търси по
+// @handle/URL/точно име на канал (resolveChannel в background.js). Изборът е
+// на потребителя — по подразбиране "video", за да не се "хваща" грешен канал
+// без изричен избор.
+const SEARCH_MODE_OPTIONS = [
+  { key: "video", label: "Videos" },
+  { key: "channel", label: "Channel" },
+];
+const DEFAULT_SEARCH_MODE = "video";
+
 let lastProcessedKey = null;
 let currentDateRange = DEFAULT_DATE_RANGE;
+let currentSearchMode = DEFAULT_SEARCH_MODE;
 let mutationObserver = null;
 let extensionEnabled = true;
 // Кеш на последно рендерирания панел — YouTube понякога изцяло презаписва
@@ -195,7 +207,7 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function renderControls(query, activeRange) {
+function renderControls(query, activeRange, activeSearchMode) {
   const wrap = document.createElement("div");
   wrap.className = "yt-filter-controls";
 
@@ -215,6 +227,40 @@ function renderControls(query, activeRange) {
     wrap.appendChild(button);
   }
 
+  const divider = document.createElement("div");
+  divider.className = "yt-filter-divider";
+  wrap.appendChild(divider);
+
+  const modeGroup = document.createElement("div");
+  modeGroup.className = "yt-filter-mode-toggle";
+  modeGroup.setAttribute("role", "radiogroup");
+  modeGroup.setAttribute("aria-label", "Search scope");
+  for (const option of SEARCH_MODE_OPTIONS) {
+    const label = document.createElement("label");
+    label.className = "yt-filter-radio";
+
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "yt-filter-search-mode";
+    input.value = option.key;
+    input.checked = option.key === activeSearchMode;
+    input.addEventListener("change", () => {
+      if (currentSearchMode === option.key) {
+        return;
+      }
+      currentSearchMode = option.key;
+      runSearch(query, currentDateRange);
+    });
+
+    const text = document.createElement("span");
+    text.textContent = option.label;
+
+    label.appendChild(input);
+    label.appendChild(text);
+    modeGroup.appendChild(label);
+  }
+  wrap.appendChild(modeGroup);
+
   return wrap;
 }
 
@@ -232,7 +278,17 @@ function renderQuotaLine(quota) {
   return line;
 }
 
-async function renderResults(results, query, dateRange, quota, usedTier) {
+async function renderResults(
+  results,
+  query,
+  dateRange,
+  quota,
+  usedTier,
+  isChannelMode,
+  channelTitle,
+  searchMode,
+  channelNotFound
+) {
   removePanel();
   removeBanner();
 
@@ -240,13 +296,36 @@ async function renderResults(results, query, dateRange, quota, usedTier) {
   panel.id = PANEL_ID;
   panel.className = "yt-filter-panel";
 
-  panel.appendChild(renderControls(query, dateRange));
+  panel.appendChild(renderControls(query, dateRange, searchMode));
   panel.appendChild(renderQuotaLine(quota));
 
   const header = document.createElement("div");
   header.className = "yt-filter-panel__header";
   header.textContent = `Filtered results with high organic interest (${results.length})`;
   panel.appendChild(header);
+
+  if (channelNotFound) {
+    const note = document.createElement("div");
+    note.className = "yt-filter-panel__empty";
+    note.textContent =
+      `"Channel" mode is selected, but no channel matches "${query}" exactly (by name, @handle, or ` +
+      'URL). Switch to "Videos" to search it as a regular keyword instead.';
+    panel.appendChild(note);
+  }
+
+  // Channel-mode (user explicitly picked "Channel" and the query matched a
+  // channel by name/handle/URL) scopes the search to that one channel's
+  // videos, but still applies the same breakout filter as topic search —
+  // make the scoping explicit so a low result count isn't mistaken for the
+  // filter being broken.
+  if (isChannelMode) {
+    const note = document.createElement("div");
+    note.className = "yt-filter-panel__empty";
+    note.textContent =
+      `"${query}" matched channel "${channelTitle}" exactly — results are scoped to that channel's ` +
+      "videos, still filtered by the breakout (views > subscribers) rule.";
+    panel.appendChild(note);
+  }
 
   // With "Auto", the cascade may have widened the range beyond 3 months
   // (requirement: 3m -> 6m -> 1y -> all, stopping at the first tier with
@@ -259,7 +338,7 @@ async function renderResults(results, query, dateRange, quota, usedTier) {
     panel.appendChild(note);
   }
 
-  if (results.length === 0) {
+  if (results.length === 0 && !channelNotFound) {
     const empty = document.createElement("div");
     empty.className = "yt-filter-panel__empty";
     empty.textContent = "No videos match the given criteria.";
@@ -294,7 +373,17 @@ async function renderResults(results, query, dateRange, quota, usedTier) {
   }
   hideNativeResults();
 
-  lastRenderedState = { results, query, dateRange, quota, usedTier };
+  lastRenderedState = {
+    results,
+    query,
+    dateRange,
+    quota,
+    usedTier,
+    isChannelMode,
+    channelTitle,
+    searchMode,
+    channelNotFound,
+  };
 }
 
 // Ако YouTube е презаписал контейнера с резултати и е отнесъл панела ни
@@ -304,8 +393,28 @@ async function ensurePanelPresent() {
   if (!lastRenderedState || document.getElementById(PANEL_ID)) {
     return;
   }
-  const { results, query, dateRange, quota, usedTier } = lastRenderedState;
-  await renderResults(results, query, dateRange, quota, usedTier);
+  const {
+    results,
+    query,
+    dateRange,
+    quota,
+    usedTier,
+    isChannelMode,
+    channelTitle,
+    searchMode,
+    channelNotFound,
+  } = lastRenderedState;
+  await renderResults(
+    results,
+    query,
+    dateRange,
+    quota,
+    usedTier,
+    isChannelMode,
+    channelTitle,
+    searchMode,
+    channelNotFound
+  );
 }
 
 // YouTube зарежда допълнително съдържание асинхронно, на талази, известно
@@ -331,45 +440,66 @@ async function runSearch(query, dateRange) {
   burstHideNativeContent();
   await showBanner(`Filtering results for "${query}" (${rangeLabel(dateRange)})…`, "loading");
 
-  chrome.runtime.sendMessage({ type: "FILTERED_SEARCH", query, dateRange }, async (response) => {
-    // If the extension was turned off while we were waiting for a response
-    // from background.js (async network request), this callback will still
-    // fire later — without this check it would overwrite the panel/banner as
-    // if nothing had been turned off. Late responses are ignored entirely.
-    if (!extensionEnabled) {
-      return;
-    }
-    if (chrome.runtime.lastError) {
-      await showBanner(`Error: ${chrome.runtime.lastError.message}`, "error");
-      return;
-    }
-    if (!response) {
-      await showBanner("No response from the extension.", "error");
-      return;
-    }
-    if (response.error === "NO_API_KEY") {
-      await showBanner(
-        "No YouTube API key set. Open the extension icon in the top-right of the browser and enter one.",
-        "error"
+  // Прихванато тук, не прочетено от currentSearchMode вътре в callback-а: ако
+  // потребителят превключи режима, докато тази заявка е в ход, response
+  // callback-ът трябва да отрази режима, с който РЕАЛНО е пратена именно тази
+  // заявка — не какъвто currentSearchMode се окаже да е в момента на отговора
+  // (по-бавен "Channel" отговор, пристигнал след по-бърз следващ "Videos"
+  // клик, иначе би се рендирал с грешно маркиран активен бутон).
+  const requestedSearchMode = currentSearchMode;
+
+  chrome.runtime.sendMessage(
+    { type: "FILTERED_SEARCH", query, dateRange, searchMode: requestedSearchMode },
+    async (response) => {
+      // If the extension was turned off while we were waiting for a response
+      // from background.js (async network request), this callback will still
+      // fire later — without this check it would overwrite the panel/banner as
+      // if nothing had been turned off. Late responses are ignored entirely.
+      if (!extensionEnabled) {
+        return;
+      }
+      if (chrome.runtime.lastError) {
+        await showBanner(`Error: ${chrome.runtime.lastError.message}`, "error");
+        return;
+      }
+      if (!response) {
+        await showBanner("No response from the extension.", "error");
+        return;
+      }
+      if (response.error === "NO_API_KEY") {
+        await showBanner(
+          "No YouTube API key set. Open the extension icon in the top-right of the browser and enter one.",
+          "error"
+        );
+        return;
+      }
+      if (response.error === "QUOTA_EXCEEDED") {
+        const used = response.quota ? formatNumber(response.quota.used) : "?";
+        const limit = response.quota ? formatNumber(response.quota.limit) : "10,000";
+        await showBanner(
+          `The daily YouTube Data API quota is exhausted (${used} / ${limit} units). ` +
+            "Wait until tomorrow or use another API key — this does NOT mean there are no matching videos.",
+          "error"
+        );
+        return;
+      }
+      if (response.error) {
+        await showBanner(`Error from YouTube API: ${response.error}`, "error");
+        return;
+      }
+      await renderResults(
+        response.results,
+        query,
+        dateRange,
+        response.quota,
+        response.usedTier,
+        response.isChannelMode,
+        response.channelTitle,
+        requestedSearchMode,
+        response.channelNotFound
       );
-      return;
     }
-    if (response.error === "QUOTA_EXCEEDED") {
-      const used = response.quota ? formatNumber(response.quota.used) : "?";
-      const limit = response.quota ? formatNumber(response.quota.limit) : "10,000";
-      await showBanner(
-        `The daily YouTube Data API quota is exhausted (${used} / ${limit} units). ` +
-          "Wait until tomorrow or use another API key — this does NOT mean there are no matching videos.",
-        "error"
-      );
-      return;
-    }
-    if (response.error) {
-      await showBanner(`Error from YouTube API: ${response.error}`, "error");
-      return;
-    }
-    await renderResults(response.results, query, dateRange, response.quota, response.usedTier);
-  });
+  );
 }
 
 async function handleNavigation() {

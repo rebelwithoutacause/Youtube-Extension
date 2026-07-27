@@ -7,11 +7,11 @@ channel's subscriber count, excluding Shorts.
 
 ## What it does
 
-When you search for something on YouTube (e.g. "fasting", "movement"), the
-normal results mix everything together — viral clips, ads, random small
-channels, Shorts. This extension overwrites the "All" tab of the search
-results page with your own filtered list, matching only videos that meet
-all of the following:
+When you search for something on YouTube (e.g. "fasting"), the normal
+results mix everything together — viral clips, ads, random small channels,
+Shorts. This extension overwrites the "All" tab of the search results page
+with your own filtered list, matching only videos that meet all of the
+following:
 
 1. **Only normal videos** — no YouTube Shorts (detected via the video's
    actual duration, not by text in the title).
@@ -28,14 +28,27 @@ all of the following:
    1 year / older than 1 year).
 4. **Sorting**: sorted by `views / subscribers` ratio.
 
-### Recognizing a channel by name
+### Videos vs. Channel mode
 
-If you type the **exact name of a channel** (e.g. "The Clashers"), an
-**@handle** (e.g. `@milkokukovbg`), or a direct channel link, the extension
-recognizes this and, instead of a general topic search, shows **that
-channel's own videos** for the selected time range, sorted by views —
-without the subscriber-count/organic-interest filter (since the goal here
-is that specific channel, not discovering "breakout" topics).
+Next to the date-range buttons, the panel has a **Videos / Channel**
+toggle:
+
+- **Videos** (default) — always a plain keyword search. The query is never
+  auto-matched against channel names, so a topic word that happens to
+  coincide with a real channel's name (e.g. "movement") is still searched
+  as a topic across all channels, not silently narrowed to that one
+  channel.
+- **Channel** — only when explicitly selected: if the query is the
+  **exact name of a channel** (e.g. "The Clashers"), an **@handle** (e.g.
+  `@milkokukovbg`), or a direct channel link, the search is scoped to
+  **that channel's own videos** for the selected time range. The same
+  breakout filter and `views / subscribers` sorting from above still
+  apply — only the candidate pool is narrowed to that one channel, so a
+  channel whose videos never exceed its own subscriber count correctly
+  yields zero results (and the automatic date-range cascade widens the
+  window, same as a topic search). If no channel matches the query
+  exactly, the panel says so instead of silently falling back to a topic
+  search.
 
 Matching also transliterates Cyrillic ⇄ Latin, so a query like
 `"милко атанасов"` correctly matches a channel titled `"Milko Atanasov"`

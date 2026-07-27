@@ -6,7 +6,6 @@ const SEARCH_MAX_RESULTS = 50;
 const MIN_VIDEO_DURATION_SECONDS = 60;
 const SUBSCRIBER_THRESHOLD = 100;
 const MIN_VIEW_COUNT_LOW_SUBS = 2500;
-const RELEVANCE_BYPASS_MIN_CANDIDATES = 5;
 const MAX_RETRIES = 5;
 const RETRY_BACKOFF_MS = 1000;
 const BATCH_SIZE = 50;
@@ -260,13 +259,14 @@ function stem(word) {
   return word.slice(0, -2);
 }
 
-// Прилага се към всички кандидати (виж searchTopicVideos) — но ако би
-// изчистила абсолютно всички резултати ПРИ ДОСТАТЪЧНО ГОЛЯМ пул, се прескача
-// изцяло за тази заявка, защото заглавия често описват съдържанието с
-// различни думи от търсената фраза (напр. канал "NOVA" (латиница) за търсене
-// "Нова телевизия" (кирилица) никога няма да съвпадне буквално).
-function matchesQuery(title, description, query) {
-  const haystack = `${title} ${description || ""}`.toLowerCase();
+// Прилага се към всички кандидати (виж searchTopicVideos). Проверява само
+// заглавието, НЕ и описанието — описанията са прекалено шумни (hashtags,
+// генерични инструкции, несвързан текст) и лесно водят до фалшиви съвпадения
+// с общи думи от заявката (напр. заявка "само 5 килограма отгоре" съвпадаше с
+// рецепта за козунак, защото описанието ѝ случайно съдържаше и "килограма",
+// и "отгоре" някъде в текста, без връзка с темата на търсенето).
+function matchesQuery(title, query) {
+  const haystack = title.toLowerCase();
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
 
@@ -396,10 +396,12 @@ async function getChannelByHandle(handle, keyRotator) {
   return (data.items || [])[0] || null;
 }
 
-// Канал-режим: заявката съвпада с име на канал — показваме НЕГОВИТЕ видеа от
-// избрания период, сортирани по гледания (без Shorts), БЕЗ engagement
-// филтъра (viewCount > subscriberCount), защото целта тук е топ съдържанието
-// на конкретния канал, не откриване на "подценени" видеа.
+// Канал-режим: използва се САМО когато потребителят изрично е избрал "Channel"
+// (searchMode) в панела — заявката се разпознава като име/handle/URL на канал
+// и търсенето се ограничава до НЕГОВИТЕ видеа от избрания период (по-евтино и
+// по-точно от обикновено търсене по ключова дума). Прилагаме същия
+// engagement/breakout филтър (passesEngagementFilter) и сортиране по ratio
+// като topic search — "high organic interest" важи еднакво в двата режима.
 // Забележка: не ползваме channels.contentDetails.relatedPlaylists.uploads +
 // playlistItems.list — тази "uploads playlist" връща playlistNotFound
 // (HTTP 404) за част от каналите (позната особеност на YouTube API), докато
@@ -454,6 +456,7 @@ async function searchChannelVideos(channel, keyRotator, publishedAfter, publishe
   const results = videos
     .filter(hasRequiredFields)
     .filter((video) => !isShort(video.contentDetails.duration))
+    .filter((video) => passesEngagementFilter(subscriberCount, Number(video.statistics.viewCount || 0)))
     .map((video) => {
       const viewCount = Number(video.statistics.viewCount || 0);
       const divisor = subscriberCount > 0 ? subscriberCount : 1;
@@ -474,7 +477,7 @@ async function searchChannelVideos(channel, keyRotator, publishedAfter, publishe
       };
     });
 
-  results.sort((a, b) => b.viewCount - a.viewCount);
+  results.sort((a, b) => b.ratio - a.ratio);
   return results;
 }
 
@@ -482,8 +485,25 @@ async function searchChannelVideos(channel, keyRotator, publishedAfter, publishe
 // 1 година -> без ограничение, спирайки на първото ниво с поне 1 резултат
 // (изискване: "Priority: Last 3 months, then 6 months, then 1 year, then
 // all"). Конкретна стойност прави еднократно търсене само с този период.
-async function searchQualifyingVideos(query, keyRotator, dateRange) {
-  const matchingChannel = await resolveChannel(query, keyRotator);
+//
+// searchMode избира изрично между "video" (винаги обикновено theme
+// търсене — НИКОГА не се опитва да разпознае канал, дори заявката случайно
+// да съвпада с точно име на канал) и "channel" (изрично търсене по
+// канал — @handle/URL/точно име, чрез resolveChannel). По подразбиране е
+// "video", за да не се "хваща" канал вместо обикновена дума без изричен
+// избор от потребителя.
+async function searchQualifyingVideos(query, keyRotator, dateRange, searchMode) {
+  const mode = searchMode === "channel" ? "channel" : "video";
+  const matchingChannel = mode === "channel" ? await resolveChannel(query, keyRotator) : null;
+  const channelMeta = {
+    isChannelMode: Boolean(matchingChannel),
+    channelTitle: matchingChannel ? matchingChannel.snippet.title : null,
+  };
+
+  if (mode === "channel" && !matchingChannel) {
+    return { results: [], usedTier: null, ...channelMeta, channelNotFound: true };
+  }
+
   const tiers = dateRange === AUTO_DATE_RANGE ? AUTO_CASCADE_TIERS : [dateRange];
 
   for (let i = 0; i < tiers.length; i += 1) {
@@ -496,10 +516,10 @@ async function searchQualifyingVideos(query, keyRotator, dateRange) {
       : await searchTopicVideos(query, keyRotator, publishedAfter, publishedBefore);
 
     if (results.length > 0) {
-      return { results, usedTier: tiers[i] };
+      return { results, usedTier: tiers[i], ...channelMeta };
     }
   }
-  return { results: [], usedTier: tiers[tiers.length - 1] };
+  return { results: [], usedTier: tiers[tiers.length - 1], ...channelMeta };
 }
 
 async function searchTopicVideos(query, keyRotator, publishedAfter, publishedBefore) {
@@ -599,29 +619,20 @@ async function searchTopicVideos(query, keyRotator, publishedAfter, publishedBef
     });
   }
 
+  // Забележка: по-рано тук имаше "bypass" — ако релевантността изчистваше
+  // всички кандидати, но пулът беше достатъчно голям (>=5), се приемаше, че
+  // причината е бранд/скрипт разлика (напр. "Нова телевизия" срещу канал
+  // "NOVA") и се връщаха ВСИЧКИ кандидати без връзка със заявката. На
+  // практика това показваше напълно нерелевантни видеа (напр. заявка за име
+  // на човек връщаше случайни breakout видеа от съвсем други канали/теми,
+  // защото пулът случайно беше >=5). Script/brand търсенията вече минават
+  // изрично през "Channel" режима (resolveChannel: @handle/URL/точно име),
+  // затова тук доверяваме се единствено на текстовата релевантност.
   const relevantResults = engagementQualified
-    .filter(({ video }) => matchesQuery(video.snippet.title, video.snippet.description, query))
+    .filter(({ video }) => matchesQuery(video.snippet.title, query))
     .map(({ result }) => result);
 
-  let results;
-  if (relevantResults.length > 0) {
-    results = relevantResults;
-  } else if (engagementQualified.length >= RELEVANCE_BYPASS_MIN_CANDIDATES) {
-    // Релевантността би изчистила абсолютно всички кандидати, но пулът е
-    // достатъчно голям, за да е правдоподобно, че причината е бранд/скрипт
-    // разлика (напр. "Нова телевизия" срещу канал "NOVA" на латиница, ~40-200
-    // кандидата, всички провалени) — не че всеки от толкова много резултати
-    // е случайно ирелевантен.
-    results = engagementQualified.map(({ result }) => result);
-  } else {
-    // Малък пул и никой не минава релевантността — много по-вероятно е
-    // кандидатите просто да са ирелевантни (напр. едно случайно видео на
-    // хинди за заявка "мини книжка за личните финанси"), не системна
-    // бранд/скрипт разлика. Доверяваме се на филтъра, връщаме празно.
-    results = [];
-  }
-
-  return results.sort((a, b) => b.ratio - a.ratio);
+  return relevantResults.sort((a, b) => b.ratio - a.ratio);
 }
 
 // getQuotaStatus() никога не трябва да "проваля" отговор на съобщение — ако
@@ -667,12 +678,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
 
       const dateRange = message.dateRange || AUTO_DATE_RANGE;
-      const { results, usedTier } = await searchQualifyingVideos(
-        message.query,
-        keyRotator,
-        dateRange
-      );
-      sendResponse({ results, usedTier, quota: await safeGetQuotaStatus() });
+      const { results, usedTier, isChannelMode, channelTitle, channelNotFound } =
+        await searchQualifyingVideos(message.query, keyRotator, dateRange, message.searchMode);
+      sendResponse({
+        results,
+        usedTier,
+        isChannelMode,
+        channelTitle,
+        channelNotFound,
+        quota: await safeGetQuotaStatus(),
+      });
     } catch (error) {
       const messageText = error instanceof Error ? error.message : String(error);
       sendResponse({ error: messageText, quota: await safeGetQuotaStatus() });
