@@ -88,7 +88,18 @@ app, CLI, or extension.
 ## Windows Desktop App
 
 Download the latest `YouTubeContentResearchSetup-*.exe` from the
-[Releases](../../releases) page and run it. The installer:
+[Releases](../../releases) page and run it.
+
+> **"Windows protected your PC" / SmartScreen warning:** this is expected
+> and not a sign of malware. The installer isn't digitally code-signed (a
+> paid certificate, not something this free/open-source project currently
+> has), so Windows shows this warning for **any** unsigned app the first
+> time it's downloaded — regardless of how safe it actually is. You can
+> verify the download against `SHA256SUMS.txt` on the
+> [release page](../../releases/latest) if you want to double-check
+> integrity. To proceed: click **"More info"**, then **"Run anyway"**.
+
+The installer:
 
 - Walks you through an **installer wizard** with an optional page to enter
   your own YouTube API key(s) up front (or skip it — the app will ask on
