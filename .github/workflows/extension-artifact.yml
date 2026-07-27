@@ -1,0 +1,30 @@
+name: Extension artifact
+
+# Packages the extension/ folder into a loadable zip on every push to main,
+# so the latest build is always downloadable as a workflow artifact without
+# waiting for a version-tagged release (see release.yml for that).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: Package extension zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Package browser extension
+        run: python scripts/package_extension.py
+
+      - name: Upload extension zip
+        uses: actions/upload-artifact@v7
+        with:
+          name: extension-zip
+          path: dist/*.zip
+          if-no-files-found: error
