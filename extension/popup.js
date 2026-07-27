@@ -4,6 +4,10 @@ const status = document.getElementById("status");
 const enabledOn = document.getElementById("enabledOn");
 const enabledOff = document.getElementById("enabledOff");
 
+// Чете директно от manifest.json, за да не се разминава с реалната
+// инсталирана версия при бъдещи бъмвания.
+document.getElementById("version").textContent = `v${chrome.runtime.getManifest().version}`;
+
 function addKeyRow(value = "") {
   const row = document.createElement("div");
   row.className = "key-row";
