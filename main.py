@@ -8,7 +8,14 @@ import sys
 from youtube.api import YouTubeAPIError, YouTubeClient, YouTubeQuotaExceededError
 from youtube.config import Settings, get_user_config_path, load_settings
 from youtube.models import VideoResult
-from youtube.search import AUTO_DATE_RANGE, DATE_RANGE_PRESETS, search_qualifying_videos
+from youtube.search import (
+    AUTO_DATE_RANGE,
+    CHANNEL_SEARCH_MODE,
+    DATE_RANGE_PRESETS,
+    DEFAULT_SEARCH_MODE,
+    VIDEO_SEARCH_MODE,
+    search_qualifying_videos,
+)
 
 
 def _configure_console_encoding() -> None:
@@ -45,6 +52,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Период на публикуване: 'auto' (по подразбиране) пробва 3m -> 6m -> 1y -> all "
             "автоматично, спирайки на първото ниво с резултати; или конкретна стойност "
             "(3m/6m/1y/1y+/all) за фиксиран период без каскада."
+        ),
+    )
+    parser.add_argument(
+        "--mode",
+        dest="search_mode",
+        choices=[VIDEO_SEARCH_MODE, CHANNEL_SEARCH_MODE],
+        default=DEFAULT_SEARCH_MODE,
+        help=(
+            "'video' (по подразбиране) винаги търси по думи, без да разпознава канал от "
+            "заявката. 'channel' изрично търси канал по @handle/URL/точно име и показва "
+            "само неговите видеа."
         ),
     )
     return parser.parse_args(argv)
@@ -131,14 +149,24 @@ def _load_settings_interactive() -> Settings | None:
             return None
 
 
-def _run_search(query: str, date_range: str, client: YouTubeClient, settings: Settings) -> int:
+def _run_search(
+    query: str,
+    date_range: str,
+    client: YouTubeClient,
+    settings: Settings,
+    search_mode: str = DEFAULT_SEARCH_MODE,
+) -> int:
     try:
-        results = search_qualifying_videos(query, client, settings, date_range)
+        results = search_qualifying_videos(query, client, settings, date_range, search_mode)
     except YouTubeQuotaExceededError as exc:
         logging.error(str(exc))
         return 1
     except YouTubeAPIError as exc:
         logging.error("Грешка от YouTube API: %s", exc)
+        return 1
+    except ValueError as exc:
+        # search_mode="channel" избран, но никой канал не съвпада с заявката точно.
+        logging.error(str(exc))
         return 1
 
     if not results:
@@ -176,8 +204,21 @@ def _run_interactive(client: YouTubeClient, settings: Settings) -> int:
                 print(f"Непознат период '{date_range}', ползвам '{AUTO_DATE_RANGE}'.")
                 date_range = AUTO_DATE_RANGE
 
+            mode_choices = [VIDEO_SEARCH_MODE, CHANNEL_SEARCH_MODE]
+            mode_prompt = (
+                f"Режим [{'/'.join(mode_choices)}] (Enter = {DEFAULT_SEARCH_MODE}): "
+            )
+            try:
+                search_mode = input(mode_prompt).strip() or DEFAULT_SEARCH_MODE
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
+            if search_mode not in mode_choices:
+                print(f"Непознат режим '{search_mode}', ползвам '{DEFAULT_SEARCH_MODE}'.")
+                search_mode = DEFAULT_SEARCH_MODE
+
             print()
-            exit_code = _run_search(query, date_range, client, settings)
+            exit_code = _run_search(query, date_range, client, settings, search_mode)
             print()
     finally:
         try:
@@ -202,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.query is None:
         return _run_interactive(client, settings)
 
-    return _run_search(args.query, args.date_range, client, settings)
+    return _run_search(args.query, args.date_range, client, settings, args.search_mode)
 
 
 if __name__ == "__main__":

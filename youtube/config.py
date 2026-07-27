@@ -52,7 +52,6 @@ class Settings:
     min_video_duration_seconds: int = 60
     subscriber_threshold: int = 100
     min_view_count_low_subs: int = 2500
-    relevance_bypass_min_candidates: int = 5
     max_retries: int = 5
     retry_backoff_seconds: float = 1.0
 

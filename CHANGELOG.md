@@ -2,6 +2,39 @@
 
 All notable changes to this project are documented here.
 
+## [1.0.3] - 2026-07-28
+
+### Fixed
+- Channel mode ("exact channel name/@handle/URL" search) now applies the
+  same breakout (`views > subscribers`) filter and ratio sort as topic
+  search, instead of showing the channel's raw top-by-views videos
+  unfiltered. Previously a channel's videos could appear labeled "high
+  organic interest" even with a views/subscribers ratio well under 1x.
+- Removed the relevance "bypass" that returned every breakout-qualifying
+  candidate, unfiltered by text relevance, whenever the candidate pool was
+  large enough (>=5) and none matched the query textually. This produced
+  false positives (e.g. a search for a person's name returning unrelated
+  videos from random channels). Script/brand-mismatch searches (the
+  original reason for the bypass, e.g. "Нова телевизия" vs. channel
+  "NOVA") should use the new explicit channel mode instead.
+- Relevance matching now checks only the video title, not the
+  description — descriptions are noisy (hashtags, generic boilerplate)
+  and were producing false-positive matches on generic query words that
+  happened to appear somewhere in unrelated text (e.g. a diet-related
+  query matching an unrelated recipe video).
+- (Extension only) Fixed a race condition where switching search mode
+  while a request was still in flight could render the response with the
+  wrong (now-current) mode instead of the one it was actually sent with.
+
+### Changed
+- Channel-name matching is no longer automatic: both the CLI (`--mode
+  channel`, interactive prompt) and the extension (a Videos/Channel
+  toggle in the panel) now require explicitly requesting channel mode.
+  Previously, any query that happened to exactly match a real channel's
+  name was silently narrowed to that channel instead of being searched as
+  a topic — e.g. searching the topic "movement" would only show the
+  videos of a channel literally named "Movement".
+
 ## [1.0.2] - 2026-07-24
 
 ### Changed

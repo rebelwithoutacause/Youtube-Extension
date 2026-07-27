@@ -40,29 +40,31 @@ class TestIsShort:
 
 class TestMatchesQuery:
     def test_empty_query_always_matches(self):
-        assert matches_query("Anything at all", "", "") is True
+        assert matches_query("Anything at all", "") is True
 
     def test_title_containing_query_word_matches(self):
-        assert matches_query("My Fasting Journey", "", "fasting") is True
+        assert matches_query("My Fasting Journey", "fasting") is True
 
-    def test_description_is_also_searched(self):
-        assert matches_query("Untitled video", "this one mentions fasting", "fasting") is True
+    def test_description_is_not_searched(self):
+        # Only the title is checked — descriptions are noisy (hashtags,
+        # generic boilerplate) and easily produce false-positive matches on
+        # generic query words that happen to appear somewhere in the text.
+        assert matches_query("Untitled video", "fasting") is False
 
     def test_real_world_spam_case_does_not_match(self):
-        # Documented in search.py's rationale for calling matches_query only on
-        # suspiciously-high-ratio candidates: a legitimate song title containing
-        # "fast" as a substring must NOT count as a match for the topic "fasting".
-        assert matches_query("TAEYANG - LIVE FAST DIE SLOW", "", "fasting") is False
+        # A legitimate song title containing "fast" as a substring must NOT
+        # count as a match for the topic "fasting".
+        assert matches_query("TAEYANG - LIVE FAST DIE SLOW", "fasting") is False
 
     def test_short_words_are_all_mandatory_when_no_long_word_present(self):
         # Every word below 5 chars -> ALL of them become required.
-        assert matches_query("cats and dogs playing", "", "cat dog") is True
-        assert matches_query("only cats here", "", "cat dog") is False
+        assert matches_query("cats and dogs playing", "cat dog") is True
+        assert matches_query("only cats here", "cat dog") is False
 
     def test_long_word_makes_short_words_optional(self):
         # "fasting" (>=5 chars) is the only mandatory word; the short filler
         # word "a" is not required to be present.
-        assert matches_query("Fasting for beginners", "", "a fasting") is True
+        assert matches_query("Fasting for beginners", "a fasting") is True
 
 
 class TestPassesEngagementFilter:

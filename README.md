@@ -28,8 +28,8 @@ Watch the demo videos (presentation, API key setup, and a live search walkthroug
 
 ## What it does
 
-Given a keyword (e.g. `"fasting"`) or a channel name/handle, the tool finds
-videos matching all of the following:
+Given a keyword (e.g. `"fasting"`), the tool finds videos matching all of
+the following:
 
 1. **No Shorts** — filtered by actual video duration, not by title text.
 2. **Breakout performance** — views must exceed the channel's subscriber
@@ -42,10 +42,20 @@ videos matching all of the following:
    then no limit at all, stopping at the first tier with results.
 4. **Sorted** by `views / subscribers` ratio.
 
-If the input matches an existing channel's exact name, handle (`@handle`),
-or URL instead of a topic keyword, the tool switches to "channel mode" and
-shows that channel's own top videos by views for the selected period
-instead of doing a topic search.
+### Video vs. channel mode
+
+By default (`--mode video`) the query is always a plain keyword search — it
+is never auto-matched against channel names, so a topic word that happens
+to coincide with a real channel's name is still searched as a topic, not
+silently narrowed to that one channel.
+
+Pass `--mode channel` to search a specific channel instead: if the query is
+the **exact name of a channel**, an **@handle**, or a direct channel URL,
+the search is scoped to **that channel's own videos** for the selected
+period. The same breakout filter and `views / subscribers` sorting still
+apply — only the candidate pool is narrowed to that one channel. If no
+channel matches the query exactly, the tool reports that instead of
+silently falling back to a topic search.
 
 Built entirely on the **standard, public YouTube Data API v3** — no
 partner/proprietary API access required.
@@ -97,6 +107,7 @@ on an empty query to exit. It also still works as a scriptable CLI:
 ```
 YouTubeContentResearch.exe "fasting"
 YouTubeContentResearch.exe "movement" --range 6m
+YouTubeContentResearch.exe "The Clashers" --mode channel
 ```
 
 Chrome can't be configured to install an unpacked extension automatically
@@ -134,13 +145,16 @@ cp .env.example .env
 
 python main.py "fasting"
 python main.py "movement" --range 6m
-python main.py "The Clashers"          # exact channel name -> channel mode
-python main.py "@milkokukovbg"         # channel handle -> channel mode
-python main.py                         # no query -> interactive mode
+python main.py "The Clashers" --mode channel    # exact channel name -> channel mode
+python main.py "@milkokukovbg" --mode channel   # channel handle -> channel mode
+python main.py                                  # no query -> interactive mode
 ```
 
 `--range` options: `auto` (default — cascades 3m → 6m → 1y → all), `3m`,
 `6m`, `1y`, `1y+` (older than 1 year), `all` (no date limit).
+
+`--mode` options: `video` (default — always a keyword search) or `channel`
+(explicitly search a channel by exact name/@handle/URL).
 
 Output is a table with: Title, Channel, Subscribers, Views,
 Views/Subscribers, Published, Video URL.
@@ -154,7 +168,7 @@ pytest
 
 The suite covers `youtube/filters.py` (Shorts detection, relevance
 matching, the breakout-performance rule) and `youtube/search.py`
-(sorting, date-range cascade, relevance bypass, channel-mode, channel
+(sorting, date-range cascade, explicit video/channel mode, channel
 name matching) against an in-memory fake YouTube client — no real API
 calls or key required. Runs automatically on every push/PR via
 `.github/workflows/sanity-check.yml`.

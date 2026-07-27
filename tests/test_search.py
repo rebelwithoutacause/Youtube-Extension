@@ -1,5 +1,9 @@
+import pytest
+
 from youtube.config import Settings
 from youtube.search import (
+    CHANNEL_SEARCH_MODE,
+    VIDEO_SEARCH_MODE,
     find_matching_channel,
     resolve_channel,
     search_channel_videos,
@@ -113,9 +117,13 @@ class TestRelevanceFilter:
 
         assert [r.video_id for r in results] == ["v1"]
 
-    def test_relevance_bypassed_when_pool_is_large_and_all_irrelevant(self):
-        # Simulates the documented brand/script-mismatch case: a big-enough pool
-        # where literally none match textually should not be zeroed out.
+    def test_no_bypass_even_when_pool_is_large_and_all_irrelevant(self):
+        # A previously-removed "bypass" used to assume a big-enough pool where
+        # literally none match textually must be a brand/script mismatch, and
+        # returned everything unfiltered. That produced false positives (e.g. a
+        # completely unrelated recipe video for a fitness query) and was
+        # dropped — such queries now go through explicit CHANNEL_SEARCH_MODE
+        # instead. A large irrelevant pool must still be filtered to empty.
         channel = make_channel("c1", title="Channel", subscriber_count=1_000)
         videos = [
             make_video(
@@ -125,13 +133,12 @@ class TestRelevanceFilter:
             for i in range(5)
         ]
         client = FakeYouTubeClient(videos=videos, channels=[channel])
-        settings = make_settings(relevance_bypass_min_candidates=5)
 
-        results = search_qualifying_videos("fasting", client, settings, date_range="3m")
+        results = search_qualifying_videos("fasting", client, make_settings(), date_range="3m")
 
-        assert {r.video_id for r in results} == {v["id"] for v in videos}
+        assert results == []
 
-    def test_relevance_not_bypassed_when_pool_is_small(self):
+    def test_relevance_filters_small_irrelevant_pool_to_empty(self):
         channel = make_channel("c1", title="Channel", subscriber_count=1_000)
         videos = [
             make_video(
@@ -141,9 +148,8 @@ class TestRelevanceFilter:
             for i in range(3)
         ]
         client = FakeYouTubeClient(videos=videos, channels=[channel])
-        settings = make_settings(relevance_bypass_min_candidates=5)
 
-        results = search_qualifying_videos("fasting", client, settings, date_range="3m")
+        results = search_qualifying_videos("fasting", client, make_settings(), date_range="3m")
 
         assert results == []
 
@@ -187,21 +193,27 @@ class TestChannelMode:
         assert resolved is not None
         assert resolved["id"] == "c1"
 
-    def test_channel_mode_skips_engagement_filter_and_sorts_by_views(self):
-        # Views far below subscriber count would fail the topic-search breakout
-        # filter, but channel mode shows a channel's own top content regardless.
-        channel = make_channel("c1", title="Milko Kukov", subscriber_count=1_000_000)
-        low_view_video = make_video(
+    def test_channel_mode_applies_breakout_filter_and_sorts_by_ratio(self):
+        # Channel mode applies the same breakout filter as topic search — a
+        # channel's raw top-by-views videos are no longer shown unfiltered
+        # (that previously let videos with views far below the channel's own
+        # subscriber count show up labeled as "high organic interest").
+        channel = make_channel("c1", title="Milko Kukov", subscriber_count=1_000)
+        below_breakout_video = make_video(
             "v1", title="Older video", channel_id="c1",
-            view_count=100, published_days_ago=1,
+            view_count=500, published_days_ago=1,
         )
-        high_view_video = make_video(
-            "v2", title="Popular video", channel_id="c1",
-            view_count=50_000, published_days_ago=2,
+        modest_breakout_video = make_video(
+            "v2", title="Modest hit", channel_id="c1",
+            view_count=2_000, published_days_ago=2,
+        )
+        big_breakout_video = make_video(
+            "v3", title="Popular video", channel_id="c1",
+            view_count=50_000, published_days_ago=3,
         )
         client = FakeYouTubeClient(
-            videos=[low_view_video, high_view_video],
-            channel_video_ids={"c1": ["v1", "v2"]},
+            videos=[below_breakout_video, modest_breakout_video, big_breakout_video],
+            channel_video_ids={"c1": ["v1", "v2", "v3"]},
         )
 
         results = search_channel_videos(
@@ -209,7 +221,8 @@ class TestChannelMode:
             published_after=days_ago(90), published_before=None,
         )
 
-        assert [r.video_id for r in results] == ["v2", "v1"]
+        # v1 excluded (views below subscribers); v3 has the higher ratio than v2.
+        assert [r.video_id for r in results] == ["v3", "v2"]
 
     def test_channel_mode_still_excludes_shorts(self):
         channel = make_channel("c1", title="Milko Kukov", subscriber_count=1_000_000)
@@ -225,6 +238,69 @@ class TestChannelMode:
         )
 
         assert results == []
+
+
+class TestExplicitSearchMode:
+    """search_qualifying_videos only resolves a channel when explicitly asked."""
+
+    def test_video_mode_never_resolves_channel_even_on_exact_name_match(self):
+        # A topic word ("movement") that happens to exactly match a real
+        # channel's name must NOT be silently narrowed to that channel unless
+        # CHANNEL_SEARCH_MODE was explicitly requested.
+        channel = make_channel("c1", title="Movement", subscriber_count=1_000)
+        matching_channel_video = make_video(
+            "v1", title="Movement channel video", channel_id="c1",
+            view_count=100, published_days_ago=1,
+        )
+        topic_channel = make_channel("c2", title="Other Channel", subscriber_count=100)
+        topic_video = make_video(
+            "v2", title="Movement in dance", channel_id="c2",
+            view_count=5_000, published_days_ago=1,
+        )
+        client = FakeYouTubeClient(
+            videos=[matching_channel_video, topic_video],
+            channels=[channel, topic_channel],
+            channel_search_results={"movement": [{"snippet": {"channelId": "c1", "title": "Movement"}}]},
+            channel_video_ids={"c1": ["v1"]},
+        )
+
+        results = search_qualifying_videos(
+            "movement", client, make_settings(), date_range="3m", search_mode=VIDEO_SEARCH_MODE,
+        )
+
+        # Only the topic-search result qualifies (breakout: 5000 > 100); the
+        # channel's own video ("v1", 100 views vs 1000 subs) is not even in
+        # the candidate pool, since channel mode was never triggered.
+        assert [r.video_id for r in results] == ["v2"]
+
+    def test_channel_mode_raises_when_no_channel_matches_exactly(self):
+        client = FakeYouTubeClient(channel_search_results={"no such channel": []})
+
+        with pytest.raises(ValueError):
+            search_qualifying_videos(
+                "no such channel", client, make_settings(), date_range="3m",
+                search_mode=CHANNEL_SEARCH_MODE,
+            )
+
+    def test_channel_mode_scopes_to_the_matched_channel(self):
+        channel = make_channel("c1", title="Milko Kukov", subscriber_count=500)
+        video = make_video(
+            "v1", title="Some video", channel_id="c1",
+            view_count=1_000, published_days_ago=1,
+        )
+        client = FakeYouTubeClient(
+            videos=[video],
+            channels=[channel],
+            channels_by_handle={"@milkokukovbg": channel},
+            channel_video_ids={"c1": ["v1"]},
+        )
+
+        results = search_qualifying_videos(
+            "@milkokukovbg", client, make_settings(), date_range="3m",
+            search_mode=CHANNEL_SEARCH_MODE,
+        )
+
+        assert [r.video_id for r in results] == ["v1"]
 
 
 class TestFindMatchingChannel:

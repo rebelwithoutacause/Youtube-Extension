@@ -37,6 +37,16 @@ _AUTO_CASCADE_TIERS = ["3m", "6m", "1y", "all"]
 _HANDLE_PATTERN = re.compile(r"(?:youtube\.com/)?@([\w.-]+)", re.IGNORECASE)
 _CHANNEL_ID_PATTERN = re.compile(r"youtube\.com/channel/(UC[\w-]{20,})", re.IGNORECASE)
 
+# "video" винаги търси по думи (никога не разпознава канал от заявката, дори
+# тя случайно да съвпада с точно име на канал). "channel" изрично търси по
+# @handle/URL/точно име на канал (resolve_channel). По подразбиране е
+# "video", за да не се "хваща" грешен канал без изричен избор от потребителя
+# (напр. тематично търсене "movement", което случайно съвпада с точното име
+# на реален канал, не бива тихо да се сведе само до неговите видеа).
+VIDEO_SEARCH_MODE = "video"
+CHANNEL_SEARCH_MODE = "channel"
+DEFAULT_SEARCH_MODE = VIDEO_SEARCH_MODE
+
 
 def resolve_channel(query: str, client: YouTubeClient) -> dict | None:
     """
@@ -67,6 +77,7 @@ def search_qualifying_videos(
     client: YouTubeClient,
     settings: Settings,
     date_range: str = DEFAULT_DATE_RANGE,
+    search_mode: str = DEFAULT_SEARCH_MODE,
 ) -> list[VideoResult]:
     """
     date_range="auto" пуска клиентската каскада: 3 месеца -> 6 месеца ->
@@ -76,8 +87,25 @@ def search_qualifying_videos(
     резултата само защото зададеният период е твърде тесен). Конкретна
     стойност (3m/6m/1y/1y+/all) прави еднократно търсене само с този период,
     без каскада — за ръчно избран от потребителя период.
+
+    search_mode="video" (по подразбиране) никога не разпознава канал —
+    заявката винаги минава като обикновено theme търсене. search_mode=
+    "channel" изрично търси канал по @handle/URL/точно име (resolve_channel);
+    ако не намери такъв, хвърля ValueError вместо тихо да премине към theme
+    търсене.
     """
-    channel = resolve_channel(query, client)
+    if search_mode not in (VIDEO_SEARCH_MODE, CHANNEL_SEARCH_MODE):
+        raise ValueError(
+            f"Непознат search_mode '{search_mode}'. Валидни стойности: "
+            f"'{VIDEO_SEARCH_MODE}', '{CHANNEL_SEARCH_MODE}'."
+        )
+
+    channel = resolve_channel(query, client) if search_mode == CHANNEL_SEARCH_MODE else None
+    if search_mode == CHANNEL_SEARCH_MODE and channel is None:
+        raise ValueError(
+            f'"Channel" режим е избран, но никой канал не съвпада с "{query}" точно '
+            "(по име, @handle или URL)."
+        )
 
     if date_range == AUTO_DATE_RANGE:
         tiers = _AUTO_CASCADE_TIERS
@@ -185,50 +213,26 @@ def _search_topic_videos(
         )
         engagement_qualified.append((video, candidate))
 
-    relevant_results = [
+    # Забележка: по-рано тук имаше "bypass" — ако релевантността изчистваше
+    # всички кандидати, но пулът беше достатъчно голям (>= relevance_bypass_
+    # min_candidates), се приемаше, че причината е бранд/скрипт разлика
+    # (напр. "Нова телевизия" срещу канал "NOVA") и се връщаха ВСИЧКИ
+    # кандидати без връзка със заявката. На практика това показваше напълно
+    # нерелевантни видеа (напр. заявка за име на човек връщаше случайни
+    # breakout видеа от съвсем други канали/теми, защото пулът случайно беше
+    # >= прага). Script/brand търсенията вече минават изрично през
+    # search_mode="channel" (resolve_channel: @handle/URL/точно име), затова
+    # тук доверяваме се единствено на текстовата релевантност.
+    results = [
         candidate
         for video, candidate in engagement_qualified
-        if matches_query(video["snippet"]["title"], video["snippet"].get("description", ""), query)
+        if matches_query(video["snippet"]["title"], query)
     ]
-
-    if relevant_results:
-        # Нормален случай: релевантността отсява spam/tag-stuffing (напр.
-        # "TAEYANG - LIVE FAST DIE SLOW" за търсене "fasting") без да изчиства
-        # всичко.
-        results = relevant_results
-        logger.info(
-            "%d видеа отпаднаха като нерелевантни, %d останаха.",
-            len(engagement_qualified) - len(relevant_results),
-            len(relevant_results),
-        )
-    elif len(engagement_qualified) >= settings.relevance_bypass_min_candidates:
-        # Релевантността би изчистила абсолютно всички кандидати, но пулът е
-        # достатъчно голям (>= relevance_bypass_min_candidates), за да е
-        # правдоподобно, че причината е бранд/скрипт разлика (напр. "Нова
-        # телевизия" срещу канал "NOVA" на латиница, ~40-200 кандидата, всички
-        # провалени) — не че всеки от толкова много резултати е случайно
-        # ирелевантен. В този случай филтърът се прескача за тази заявка.
-        results = [candidate for _video, candidate in engagement_qualified]
-        logger.info(
-            "Филтърът за релевантност би изчистил всички %d резултата (пул >= %d) — "
-            "прескочен за тази заявка (вероятно бранд/скрипт разлика).",
-            len(results),
-            settings.relevance_bypass_min_candidates,
-        )
-    else:
-        # Малък пул (< relevance_bypass_min_candidates) и никой не минава
-        # релевантността — много по-вероятно е кандидатите просто да са
-        # ирелевантни (напр. едно случайно видео на хинди за заявка "мини
-        # книжка за личните финанси"), не системна бранд/скрипт разлика.
-        # Доверяваме се на филтъра и връщаме празно, вместо grasping at straws.
-        results = []
-        if engagement_qualified:
-            logger.info(
-                "%d кандидат(и) провалиха релевантността, пулът е твърде малък "
-                "(< %d) за bypass — връщаме 0 резултата.",
-                len(engagement_qualified),
-                settings.relevance_bypass_min_candidates,
-            )
+    logger.info(
+        "%d видеа отпаднаха като нерелевантни, %d останаха.",
+        len(engagement_qualified) - len(results),
+        len(results),
+    )
 
     sorted_results = sorted(results, key=lambda r: r.ratio, reverse=True)
     logger.info("%d видеа отговарят на всички критерии.", len(sorted_results))
@@ -304,10 +308,12 @@ def search_channel_videos(
     published_before: str | None,
 ) -> list[VideoResult]:
     """
-    Канал-режим: заявката съвпада с име на канал — показваме НЕГОВИТЕ видеа
-    от избрания период, сортирани по гледания (без Shorts), БЕЗ engagement
-    филтъра (viewCount > subscriberCount), защото целта тук не е да се открият
-    "подценени" видеа, а просто топ съдържанието на конкретния канал.
+    Канал-режим: използва се САМО когато потребителят изрично е избрал
+    search_mode="channel" — заявката е разпозната като име/handle/URL на
+    канал и търсенето се ограничава до НЕГОВИТЕ видеа от избрания период
+    (по-евтино и по-точно от обикновено търсене по ключова дума). Прилагаме
+    същия engagement/breakout филтър и сортиране по ratio като theme
+    търсенето — "висок органичен интерес" важи еднакво в двата режима.
     """
     channel_id = channel["id"]
     channel_title = channel["snippet"]["title"]
@@ -328,6 +334,17 @@ def search_channel_videos(
         if not is_short(video["contentDetails"]["duration"], settings.min_video_duration_seconds)
     ]
 
+    engagement_qualified = [
+        video
+        for video in long_videos
+        if passes_engagement_filter(
+            subscriber_count,
+            int(video["statistics"].get("viewCount", 0)),
+            settings.subscriber_threshold,
+            settings.min_view_count_low_subs,
+        )
+    ]
+
     results = [
         VideoResult(
             video_id=video["id"],
@@ -338,12 +355,12 @@ def search_channel_videos(
             view_count=int(video["statistics"].get("viewCount", 0)),
             published_at=_parse_datetime(video["snippet"]["publishedAt"]),
         )
-        for video in long_videos
+        for video in engagement_qualified
     ]
-    results.sort(key=lambda r: r.view_count, reverse=True)
+    results.sort(key=lambda r: r.ratio, reverse=True)
     logger.info(
-        "Channel режим за '%s': %d видеа в периода, %d след Shorts филтър.",
-        channel_title, len(complete_videos), len(results),
+        "Channel режим за '%s': %d видеа в периода, %d след Shorts филтър, %d след breakout филтър.",
+        channel_title, len(complete_videos), len(long_videos), len(results),
     )
     return results
 
