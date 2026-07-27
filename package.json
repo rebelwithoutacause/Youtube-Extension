@@ -1,0 +1,12 @@
+{
+  "name": "youtube-high-interest-filter",
+  "private": true,
+  "description": "Lint tooling for the extension/ browser extension. No build step or runtime dependencies.",
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "eslint": "^9.19.0"
+  },
+  "scripts": {
+    "lint": "eslint extension/background.js extension/content.js extension/popup.js"
+  }
+}

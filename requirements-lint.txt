@@ -1,0 +1,2 @@
+# Lint-only dependency, kept separate from runtime/test/build requirements.
+ruff>=0.16,<1

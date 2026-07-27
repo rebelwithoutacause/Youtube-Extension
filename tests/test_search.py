@@ -308,7 +308,9 @@ class TestFindMatchingChannel:
         channel = make_channel("c1", title="Milko Atanasov", subscriber_count=72_600)
         client = FakeYouTubeClient(
             channels=[channel],
-            channel_search_results={"милко атанасов": [{"snippet": {"channelId": "c1", "title": "Milko Atanasov"}}]},
+            channel_search_results={
+                "милко атанасов": [{"snippet": {"channelId": "c1", "title": "Milko Atanasov"}}]
+            },
         )
 
         found = find_matching_channel("милко атанасов", client)

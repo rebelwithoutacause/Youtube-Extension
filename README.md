@@ -173,6 +173,18 @@ name matching) against an in-memory fake YouTube client — no real API
 calls or key required. Runs automatically on every push/PR via
 `.github/workflows/sanity-check.yml`.
 
+## Linting
+
+```bash
+pip install -r requirements-lint.txt
+ruff check main.py youtube/ tests/ scripts/
+
+npm install
+npm run lint  # eslint over extension/*.js
+```
+
+Runs automatically on every push/PR via `.github/workflows/lint.yml`.
+
 ## Browser extension
 
 The `extension/` folder contains a Chrome/Edge extension that applies the
@@ -188,6 +200,10 @@ main.py                CLI entry point (also drives the packaged .exe)
 requirements.txt       Runtime Python dependencies
 requirements-build.txt Build-only dependencies (PyInstaller, Pillow)
 requirements-dev.txt   Test-only dependencies (pytest)
+requirements-lint.txt  Lint-only dependency (ruff)
+pyproject.toml         Ruff configuration
+package.json            eslint devDependency + `npm run lint` script
+eslint.config.js        eslint flat config for extension/*.js
 pytest.ini             pytest configuration
 .env.example            Config template (copy to .env and add your API key)
 VERSION                 Single source of truth for the app version
@@ -211,6 +227,9 @@ scripts/
 installer/
   setup.iss            Inno Setup installer script
 .github/workflows/
-  sanity-check.yml     Syntax checks + pytest suite on every push and PR
-  release.yml          Builds & publishes installer + extension zip on version tags
+  sanity-check.yml       Syntax checks + pytest suite on every push and PR
+  lint.yml               ruff + eslint on every push and PR
+  extension-artifact.yml Uploads the packaged extension zip on every push to main
+  release.yml            Builds & publishes installer + extension zip on version tags
+.github/dependabot.yml    Weekly update PRs for GitHub Actions and pip dependencies
 ```
