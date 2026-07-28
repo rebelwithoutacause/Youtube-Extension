@@ -111,6 +111,31 @@ The installer:
 - Copies the browser extension source next to the app so you can load it in
   Chrome/Edge (see below) without a separate download.
 
+### Adding an API key after installation
+
+If you skipped the API key page during setup, there are two ways to add one
+afterwards:
+
+**Option 1 — let the app ask you (easiest).** Launch the app from the Start
+Menu with no arguments. It detects the missing key, explains where to get
+a free one, and prompts:
+`YouTube API ключ(ове), разделени със запетая:`. Paste your key (no quotes
+needed) and press Enter — it's saved automatically and the app continues.
+For multiple keys (key rotation), separate them with commas and no spaces:
+`key1,key2,key3`.
+
+**Option 2 — edit the config file directly.** Open File Explorer, go to
+`%APPDATA%\YouTubeContentResearch`, and create or edit a file named `.env`
+(with the leading dot, no `.txt` extension) containing:
+
+```
+YOUTUBE_API_KEYS=your_key_here
+```
+
+No quotes are needed around the key. For multiple keys, comma-separate
+them the same way: `YOUTUBE_API_KEYS=key1,key2,key3`. Save the file and
+relaunch the app.
+
 Launching the app with no arguments opens an **interactive prompt**: type a
 search query, pick a date range, and it prints a results table — press Enter
 on an empty query to exit. It also still works as a scriptable CLI:
