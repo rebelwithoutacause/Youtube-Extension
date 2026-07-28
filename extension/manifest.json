@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube High-Interest Filter",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Filters YouTube search results: no Shorts, breakout views/subscribers ratio regardless of channel size, with automatic date-range fallback.",
   "permissions": ["storage"],
   "host_permissions": ["https://www.googleapis.com/*"],

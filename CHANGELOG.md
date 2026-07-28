@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here.
 
+## [1.0.4] - 2026-07-28
+
+### Fixed
+- Installer wizard now always shows the "Select Destination Location" page
+  (`DisableDirPage=no`), so you can choose where the app installs instead
+  of only using the default path.
+- The desktop app's console window no longer closes instantly when no
+  YouTube API key is configured and it's launched with no arguments
+  (Start Menu/double-click) — it now pauses so the error message and the
+  key-entry prompt are actually readable before exiting.
+
+### Documented
+- README: why the "Windows protected your PC" SmartScreen warning appears
+  on the installer download (unsigned exe, not malware) and how to
+  proceed.
+- README: how to add a YouTube API key after installation if you skipped
+  it during setup (the automatic first-run prompt, or editing
+  `%APPDATA%\YouTubeContentResearch\.env` directly).
+
 ## [1.0.3] - 2026-07-28
 
 ### Fixed
