@@ -236,6 +236,16 @@ def main(argv: list[str] | None = None) -> int:
 
     settings = _load_settings_interactive()
     if settings is None:
+        # Стартирано от Explorer/Start Menu (без query аргумент) отваря
+        # прозорец на конзола, който се затваря мигновено при process exit —
+        # без тази пауза потребителят никога не вижда съобщението за грешка
+        # (напр. "Не е намерен YouTube API ключ") и не разбира, че просто
+        # трябва да пусне приложението пак и да въведе валиден ключ.
+        if args.query is None and sys.stdin.isatty():
+            try:
+                input("Натиснете Enter за изход...")
+            except (EOFError, KeyboardInterrupt):
+                print()
         return 1
 
     client = YouTubeClient(settings)
